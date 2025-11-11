@@ -1,0 +1,639 @@
+{
+  "dashboard": {
+    "title": "GameHub - Gameplay & Monitoring",
+    "uid": "gamehub-gameplay",
+    "tags": ["gamehub", "gameplay", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🎮 Active Alerts",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ALERTS{namespace=\"gamehub\", alertstate=\"firing\"} OR ALERTS{alertname=~\"GameHub.*\", alertstate=\"firing\"}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 24, "h": 6},
+        "options": {
+          "showHeader": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "alertname"},
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 200
+                }
+              ]
+            }
+          ]
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "__name__": true,
+                "Time": true,
+                "Value": true,
+                "alertstate": true,
+                "prometheus": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "alertname": "Alert Name",
+                "severity": "Severity",
+                "username": "User",
+                "game": "Game",
+                "namespace": "Namespace",
+                "pod": "Pod"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "🏆 Total Scores by Game",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(score_submissions_total) by (game)",
+            "legendFormat": "{{ game }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 6, "w": 8, "h": 4},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "blue"},
+                {"value": 5, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 20, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "👥 Total Scores by User",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(score_submissions_total) by (username)",
+            "legendFormat": "{{ username }}"
+          }
+        ],
+        "gridPos": {"x": 8, "y": 6, "w": 8, "h": 4},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "purple"},
+                {"value": 5, "color": "green"},
+                {"value": 10, "color": "yellow"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "📊 Score Submission Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(score_submissions_total[5m])) * 60",
+            "legendFormat": "Scores/min"
+          }
+        ],
+        "gridPos": {"x": 16, "y": 6, "w": 8, "h": 4},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "scores/min",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "🎯 Latest Scores by User and Game",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "last_score_value",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {"x": 0, "y": 10, "w": 12, "h": 8},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Score",
+              "desc": true
+            }
+          ]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto"
+            }
+          }
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "__name__": true,
+                "Time": true,
+                "user_id": true,
+                "instance": true,
+                "job": true,
+                "namespace": true,
+                "pod": true,
+                "service": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "username": "👤 User",
+                "game": "🎮 Game",
+                "Value": "🏆 Score"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "📈 Score Submissions Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(increase(score_submissions_total[1m])) by (game)",
+            "legendFormat": "{{ game }}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 10, "w": 12, "h": 8},
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Submissions"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "legend": {
+          "show": true,
+          "alignAsTable": true,
+          "rightSide": false
+        }
+      },
+      {
+        "id": 7,
+        "title": "🏅 Top Scores",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "topk(10, last_score_value)",
+            "legendFormat": "{{ username }} - {{ game }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 18, "w": 12, "h": 8},
+        "options": {
+          "displayMode": "gradient",
+          "orientation": "horizontal",
+          "showUnfilled": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 50000, "color": "yellow"},
+                {"value": 80000, "color": "red"}
+              ]
+            },
+            "max": 100000
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "⚡ Scores by Game Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "last_score_value",
+            "legendFormat": "{{ username }} - {{ game }}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 18, "w": 12, "h": 8},
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Score"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "💻 Pod CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"gamehub\",container!=\"\",container!=\"POD\"}[5m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 26, "w": 12, "h": 8},
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "label": "CPU Usage"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "legend": {
+          "show": true,
+          "alignAsTable": true,
+          "rightSide": false,
+          "avg": true,
+          "current": true,
+          "max": true
+        }
+      },
+      {
+        "id": 10,
+        "title": "💾 Pod Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"gamehub\",container!=\"\",container!=\"POD\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 26, "w": 12, "h": 8},
+        "yaxes": [
+          {
+            "format": "bytes",
+            "label": "Memory"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "legend": {
+          "show": true,
+          "alignAsTable": true,
+          "rightSide": false,
+          "avg": true,
+          "current": true,
+          "max": true
+        }
+      },
+      {
+        "id": 11,
+        "title": "🔄 Pod Restarts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"gamehub\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 34, "w": 8, "h": 4},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 3, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "✅ Pod Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(kube_pod_status_phase{namespace=\"gamehub\",phase=\"Running\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }
+        ],
+        "gridPos": {"x": 8, "y": 34, "w": 8, "h": 4},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "1": {
+                    "text": "Running"
+                  },
+                  "0": {
+                    "text": "Down"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "🌐 Network Traffic (Received)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"gamehub\"}[5m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }
+        ],
+        "gridPos": {"x": 16, "y": 34, "w": 8, "h": 4},
+        "yaxes": [
+          {
+            "format": "Bps",
+            "label": "Received"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "📦 Container Resource Limits vs Usage",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"gamehub\",container!=\"\",container!=\"POD\"}) by (pod, container)",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          },
+          {
+            "expr": "sum(kube_pod_container_resource_limits{namespace=\"gamehub\",resource=\"memory\"}) by (pod, container)",
+            "format": "table",
+            "instant": true,
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"gamehub\",container!=\"\",container!=\"POD\"}[5m])) by (pod, container)",
+            "format": "table",
+            "instant": true,
+            "refId": "C"
+          },
+          {
+            "expr": "sum(kube_pod_container_resource_limits{namespace=\"gamehub\",resource=\"cpu\"}) by (pod, container)",
+            "format": "table",
+            "instant": true,
+            "refId": "D"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 38, "w": 24, "h": 8},
+        "transformations": [
+          {
+            "id": "merge"
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "Time 1": true,
+                "Time 2": true,
+                "Time 3": true,
+                "Time 4": true,
+                "namespace": true,
+                "resource": true,
+                "instance": true,
+                "node": true,
+                "uid": true
+              },
+              "renameByName": {
+                "pod": "Pod",
+                "container": "Container",
+                "Value #A": "Memory Used",
+                "Value #B": "Memory Limit",
+                "Value #C": "CPU Used",
+                "Value #D": "CPU Limit"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Memory Used"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "bytes"
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": 0, "color": "green"},
+                      {"value": 100000000, "color": "yellow"},
+                      {"value": 200000000, "color": "red"}
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Memory Limit"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "bytes"
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "CPU Used"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percentunit"
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": 0, "color": "green"},
+                      {"value": 0.5, "color": "yellow"},
+                      {"value": 0.8, "color": "red"}
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "CPU Limit"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "short"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 15,
+        "title": "🔥 High Score Alerts History",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ALERTS{alertname=\"GameHubHighScore\"}",
+            "legendFormat": "{{ username }} - {{ game }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 46, "w": 12, "h": 6},
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "title": "⚠️ All GameHub Alerts Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(ALERTS{alertname=~\"GameHub.*\"}) by (alertname, severity)",
+            "legendFormat": "{{ alertname }} ({{ severity }})"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 46, "w": 12, "h": 6},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "orientation": "horizontal",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

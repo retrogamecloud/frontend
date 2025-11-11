@@ -1,0 +1,131 @@
+# Template para Deployments de juegos individuales
+# Cada juego tendrá su propio deployment escalable
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mortalkombat-game
+  namespace: gamehub
+  labels:
+    app: mortalkombat-game
+    tier: frontend
+    game: mortalkombat
+spec:
+  replicas: 1  # Mínimo inicial, HPA escalará automáticamente
+  selector:
+    matchLabels:
+      app: mortalkombat-game
+  template:
+    metadata:
+      labels:
+        app: mortalkombat-game
+        tier: frontend
+        game: mortalkombat
+    spec:
+      containers:
+      - name: mortalkombat-container
+        image: gamehub-frontend-mortalkombat:latest
+        imagePullPolicy: Never  # Para Minikube usa imágenes locales
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: GAME_NAME
+          value: "mortalkombat"
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            cpu: 100m      # 0.1 CPU core
+            memory: 128Mi   # 128 MB RAM
+          limits:
+            cpu: 500m      # 0.5 CPU core máximo
+            memory: 512Mi   # 512 MB RAM máximo
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+      # Afinidad de pods para mejor distribución en nodos
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mortalkombat-game
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mortalkombat-game-service
+  namespace: gamehub
+  labels:
+    app: mortalkombat-game
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: http
+  selector:
+    app: mortalkombat-game
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mortalkombat-game-hpa
+  namespace: gamehub
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mortalkombat-game
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # Escalar cuando CPU > 70%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Escalar cuando memoria > 80%
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Esperar 5 min antes de escalar hacia abajo
+      policies:
+      - type: Percent
+        value: 50  # Reducir máximo 50% de pods a la vez
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0  # Escalar hacia arriba inmediatamente
+      policies:
+      - type: Percent
+        value: 100  # Duplicar pods si es necesario
+        periodSeconds: 15
+      - type: Pods
+        value: 2  # O añadir 2 pods
+        periodSeconds: 15
+      selectPolicy: Max  # Usar la política más agresiva

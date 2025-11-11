@@ -1,0 +1,274 @@
+# Prometheus Stack Configuration for GameHub
+# Optimized for Minikube with 8GB RAM
+
+# Global settings
+fullnameOverride: "prometheus"
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false  # Disable if not using etcd
+    configReloaders: true
+    general: true
+    k8s: true
+    kubeApiserverAvailability: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubeProxy: false
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
+
+# AlertManager configuration
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    secrets:
+      - alertmanager-slack
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  config:
+    global:
+      resolve_timeout: 5m
+      slack_api_url_file: /etc/alertmanager/secrets/alertmanager-slack/webhook-url
+    
+    route:
+      group_by: ['namespace', 'alertname', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'slack-gamehub'
+      routes:
+        - match:
+            alertname: Watchdog
+          receiver: 'null'
+    
+    receivers:
+      - name: 'null'
+      
+      - name: 'slack-gamehub'
+        slack_configs:
+          - channel: '#gamehub-alertas'
+            title: '{{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} {{ .GroupLabels.alertname }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Severity:* {{ .Labels.severity }}
+              *Namespace:* {{ .Labels.namespace }}
+              {{ if .Labels.pod }}*Pod:* {{ .Labels.pod }}{{ end }}
+              {{ if .Labels.username }}*User:* {{ .Labels.username }}{{ end }}
+              {{ if .Labels.game }}*Game:* {{ .Labels.game }}{{ end }}
+              {{ end }}
+            send_resolved: true
+            color: '{{ if eq .Status "firing" }}{{ if eq .CommonLabels.severity "critical" }}danger{{ else if eq .CommonLabels.severity "warning" }}warning{{ else }}good{{ end }}{{ else }}good{{ end }}'
+    
+    templates:
+      - '/etc/alertmanager/config/*.tmpl'
+
+# Grafana configuration
+grafana:
+  enabled: true
+  adminPassword: admin123  # CHANGE THIS IN PRODUCTION!
+  
+  persistence:
+    enabled: true
+    size: 5Gi
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+      - name: 'gamehub'
+        orgId: 1
+        folder: 'GameHub'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/gamehub
+  
+  dashboards:
+    gamehub: {}  # Will be populated by ConfigMaps
+  
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-prometheus:9090
+        access: proxy
+        isDefault: true
+        jsonData:
+          timeInterval: 30s
+  
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+    datasources:
+      enabled: false
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  
+  prometheusSpec:
+    replicas: 1
+    retention: 7d
+    retentionSize: "9GB"
+    
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    
+    # Service monitors selector
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus
+    serviceMonitorNamespaceSelector:
+      any: true
+    
+    # Pod monitors selector
+    podMonitorSelector:
+      matchLabels:
+        release: prometheus
+    podMonitorNamespaceSelector:
+      any: true
+    
+    # Rule selector
+    ruleSelector:
+      matchLabels:
+        release: prometheus
+    ruleNamespaceSelector:
+      any: true
+    
+    # Additional scrape configs for GameHub services
+    additionalScrapeConfigs:
+      - job_name: 'gamehub-frontend'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - gamehub
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: frontend
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+# Prometheus Operator
+prometheusOperator:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Node Exporter
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Kube State Metrics
+kubeStateMetrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# etcd monitoring (disable for Minikube/k3s)
+kubeEtcd:
+  enabled: false
+
+# Kube Controller Manager (disable for Minikube)
+kubeControllerManager:
+  enabled: false
+
+# Kube Scheduler (disable for Minikube)
+kubeScheduler:
+  enabled: false
+
+# Kube Proxy
+kubeProxy:
+  enabled: true

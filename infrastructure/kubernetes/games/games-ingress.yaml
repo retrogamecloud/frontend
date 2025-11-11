@@ -1,0 +1,137 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gamehub-games-ingress
+  namespace: gamehub
+  annotations:
+    kubernetes.io/ingress.class: kong
+    # Habilitar CORS
+    konghq.com/plugins: cors-plugin
+    # Rate limiting global
+    konghq.com/override: "true"
+spec:
+  rules:
+  # Regla para cada juego - enruta basándose en query parameter o path
+  - host: gamehub.local
+    http:
+      paths:
+      # DOOM
+      - path: /game/doom
+        pathType: Prefix
+        backend:
+          service:
+            name: doom-game-service
+            port:
+              number: 8081
+      # Wolfenstein 3D
+      - path: /game/wolf
+        pathType: Prefix
+        backend:
+          service:
+            name: wolf-game-service
+            port:
+              number: 8081
+      # Dangerous Dave 2
+      - path: /game/dangerousdave2
+        pathType: Prefix
+        backend:
+          service:
+            name: dangerousdave2-game-service
+            port:
+              number: 8081
+      # Digger
+      - path: /game/digger
+        pathType: Prefix
+        backend:
+          service:
+            name: digger-game-service
+            port:
+              number: 8081
+      # Duke Nukem 3D
+      - path: /game/dukenukem3d
+        pathType: Prefix
+        backend:
+          service:
+            name: dukenukem3d-game-service
+            port:
+              number: 8081
+      # Heroes of Might and Magic 2
+      - path: /game/heroesofmightandmagic2
+        pathType: Prefix
+        backend:
+          service:
+            name: heroesofmightandmagic2-game-service
+            port:
+              number: 8081
+      # Lost Vikings
+      - path: /game/lostvikings
+        pathType: Prefix
+        backend:
+          service:
+            name: lostvikings-game-service
+            port:
+              number: 8081
+      # Mortal Kombat
+      - path: /game/mortalkombat
+        pathType: Prefix
+        backend:
+          service:
+            name: mortalkombat-game-service
+            port:
+              number: 8081
+      # Street Fighter 2
+      - path: /game/streetfighter2
+        pathType: Prefix
+        backend:
+          service:
+            name: streetfighter2-game-service
+            port:
+              number: 8081
+      # Tetris
+      - path: /game/tetris
+        pathType: Prefix
+        backend:
+          service:
+            name: tetris-game-service
+            port:
+              number: 8081
+---
+# Plugin de CORS para Kong
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: cors-plugin
+  namespace: gamehub
+plugin: cors
+config:
+  origins:
+  - "*"
+  methods:
+  - GET
+  - POST
+  - PUT
+  - DELETE
+  - OPTIONS
+  headers:
+  - Accept
+  - Authorization
+  - Content-Type
+  - X-Requested-With
+  exposed_headers:
+  - X-Auth-Token
+  credentials: true
+  max_age: 3600
+---
+# Plugin de rate limiting por juego
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limiting-games
+  namespace: gamehub
+plugin: rate-limiting
+config:
+  minute: 100
+  hour: 5000
+  policy: local
+  fault_tolerant: true
+  hide_client_headers: false

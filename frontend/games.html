@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>GameHub Retro - Selección de Juegos</title>
+    <link rel="stylesheet" href="retro.css">
+    <link rel="stylesheet" href="./jsdos/js-dos.css">
+    <script src="./jsdos/js-dos.js"></script>
+    <script src="score-tracker.js"></script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
+      <circle cx='32' cy='32' r='24' fill='black' stroke='%2300ff88' stroke-width='4'>
+        <animate attributeName='stroke-opacity' values='1;0.3;1' dur='2s' repeatCount='indefinite'/>
+      </circle>
+    </svg>">
+</head>
+<body>
+    
+    <div class="grid"></div>
+
+    <header>
+        <h1>🎮 GameHub Retro</h1>
+        <button class="logout" id="logoutBtn">Salir</button>
+    </header>
+
+    <div class="game-select">
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('doom')">▶️ Jugar DOOM</button>
+            <img src="img/doom-thumb.jpg" alt="DOOM" class="game-thumb" onclick="loadGame('doom')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('wolf')">▶️ Jugar Wolfstein 3D</button>
+            <img src="img/wolf-thumb.jpg" alt="wolf" class="game-thumb" onclick="loadGame('wolf')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('dangerousdave2')">▶️ Jugar Dangerous Dave 2</button>
+            <img src="img/dangerous-thumb.jpg" alt="Dangerous" class="game-thumb" onclick="loadGame('dangerousdave2')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('digger')">▶️ Jugar Digger</button>
+            <img src="img/digger-thumb.jpg" alt="digger" class="game-thumb" onclick="loadGame('digger')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('dukenukem3d')">▶️ Jugar Duke Nukem 3D</button>
+            <img src="img/duke3d-thumb.jpg" alt="duke3d" class="game-thumb" onclick="loadGame('dukenukem3d')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('heroesofmightandmagic2')">▶️ Jugar Heroes of Might and Magic 2</button>
+            <img src="img/heroes-thumb.jpg" alt="HEROES" class="game-thumb" onclick="loadGame('heroesofmightandmagic2')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('lostvikings')">▶️ Jugar Lost Vikings</button>
+            <img src="img/lost-thumb.jpg" alt="lostvikings" class="game-thumb" onclick="loadGame('lostvikings')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('mortalkombat')">▶️ Jugar Mortal Kombat</button>
+            <img src="img/mortal-thumb.jpg" alt="mortalkombat" class="game-thumb" onclick="loadGame('mortalkombat')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('streetfighter2')">▶️ Jugar Street Fighter 2</button>
+            <img src="img/street-thumb.jpg" alt="streetfighter2" class="game-thumb" onclick="loadGame('streetfighter2')">
+        </div>
+        <div class="game-card">
+            <button class="game-btn" onclick="loadGame('tetris')">▶️ Jugar Tetris</button>
+            <img src="img/tetris-thumb.jpg" alt="Tetris" class="game-thumb" onclick="loadGame('tetris')">
+        </div>
+    </div>
+
+    <div id="loader"></div>
+    <div id="dosbox-container">
+        <div id="dosbox" style="display: none;"></div>
+    </div>
+
+    <section id="ranking">
+        <h2>🏆 Clasificación de Jugadores - <span id="current-game">DOOM</span></h2>
+        <div class="ranking-tabs">
+            <button class="ranking-tab active" onclick="switchRanking('doom')">DOOM</button>
+            <button class="ranking-tab" onclick="switchRanking('wolf')">Wolfenstein 3D</button>
+            <button class="ranking-tab" onclick="switchRanking('dangerousdave2')">Dangerous Dave 2</button>
+            <button class="ranking-tab" onclick="switchRanking('digger')">Digger</button>
+            <button class="ranking-tab" onclick="switchRanking('dukenukem3d')">Duke Nukem 3D</button>
+            <button class="ranking-tab" onclick="switchRanking('heroesofmightandmagic2')">Heroes of Might and Magic 2</button>
+            <button class="ranking-tab" onclick="switchRanking('lostvikings')">Lost Vikings</button>
+            <button class="ranking-tab" onclick="switchRanking('mortalkombat')">Mortal Kombat</button>
+            <button class="ranking-tab" onclick="switchRanking('streetfighter2')">Street Fighter 2</button>  
+            <button class="ranking-tab" onclick="switchRanking('tetris')">Tetris</button>
+        </div>
+        <table>
+            <thead>
+                <tr><th>Posición</th><th>Jugador</th><th>Puntuación</th><th>Fecha</th></tr>
+            </thead>
+            <tbody id="ranking-body">
+                <tr><td colspan="4">Cargando ranking...</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section id="instructions">
+        <h2>🕹️ Controles</h2>
+        <ul>
+            <li><b>Movimiento:</b> Flechas o WASD</li>
+            <li><b>Disparar:</b> CTRL</li>
+            <li><b>Usar / Abrir puertas:</b> ESPACIO</li>
+            <li><b>Correr:</b> SHIFT (mantener)</li>
+            <li><b>Cambiar arma:</b> 1–7</li>
+            <li><b>Pantalla completa:</b> F11 o botón del juego</li>
+            <li><b>Ratón:</b> clic dentro del juego para capturarlo</li>
+        </ul>
+    </section>
+
+    <script>
+        // API URLs - All through Kong Gateway
+        const API = "http://localhost:8000/api/auth"; // auth-service through Kong
+        const SCORE_API = "http://localhost:8000/api/scores"; // score-service through Kong
+        const RANKING_API = "http://localhost:8000/api/rankings"; // ranking-service through Kong
+        
+        let accessToken = localStorage.getItem("accessToken");
+        const refreshToken = localStorage.getItem("refreshToken");
+        const username = localStorage.getItem("username");
+        const userId = localStorage.getItem("userId");
+        const loader = document.getElementById("loader");
+        let container = document.getElementById("dosbox"); // 🆕 Cambiado a let para poder reasignar
+        const rankingBody = document.getElementById("ranking-body");
+        let currentRankingGame = "doom";
+        let currentScoreSystem = null;
+        let isRedirecting = false; // 🆕 Flag para evitar cargas durante redirección
+
+        // 🆕 Función para verificar si el token está expirado
+        function isTokenExpired(token) {
+            if (!token) return true;
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return payload.exp * 1000 < Date.now();
+            } catch (e) {
+                return true;
+            }
+        }
+
+        // 🆕 Función para renovar el token
+        async function refreshAccessToken() {
+            if (!refreshToken) return false;
+            
+            try {
+                const res = await fetch(`${API}/refresh`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refreshToken })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    accessToken = data.accessToken;
+                    localStorage.setItem("accessToken", data.accessToken);
+                    console.log("✅ Token renovado exitosamente");
+                    return true;
+                }
+            } catch (err) {
+                console.error("❌ Error al renovar token:", err);
+            }
+            return false;
+        }
+
+        const JUEGOS_TITULOS = {
+            "doom": "DOOM",
+            "wolf": "Wolfenstein 3D",
+            "dangerousdave2": "Dangerous Dave 2",
+            "digger": "Digger",
+            "dukenukem3d": "Duke Nukem 3D",
+            "heroesofmightandmagic2": "Heroes of Might and Magic 2",
+            "lostvikings": "Lost Vikings",
+            "mortalkombat": "Mortal Kombat",
+            "streetfighter2": "Street Fighter 2",
+            "tetris": "Tetris"
+        };
+
+        // Verificar si está logueado (opcional para jugar, pero necesario para guardar scores)
+        const isLoggedIn = !!accessToken;
+        if (!isLoggedIn) {
+            console.warn("⚠️ No estás logueado. Puedes jugar pero no guardar puntuaciones.");
+        }
+
+        // Cargar ranking inicial al abrir la página
+        loadRanking("doom");
+
+        document.getElementById("logoutBtn").onclick = () => {
+            localStorage.clear();
+            window.location.href = "./index.html";
+        };
+
+        async function saveScore(game, score, retryCount = 0) {
+            // Prevenir bucle infinito
+            if (retryCount > 2) {
+                console.error("❌ Demasiados reintentos, abortando");
+                isRedirecting = true;
+                alert("🔒 Error al guardar puntuación después de varios intentos.\n\nPor favor, inicia sesión nuevamente.\n\nRedirigiendo al login...");
+                localStorage.clear();
+                setTimeout(() => window.location.href = "./index.html", 3000);
+                return;
+            }
+            
+            // Si no está logueado, no intentar guardar
+            if (!accessToken) {
+                console.warn("⚠️ Debes iniciar sesión para guardar tu puntuación");
+                isRedirecting = true;
+                alert("⚠️ No estás logueado.\n\n✅ Puedes jugar libremente.\n❌ NO se guardarán tus puntuaciones.\n\nRedirigiendo al login...");
+                setTimeout(() => window.location.href = "./index.html", 3000);
+                return;
+            }
+
+            // 🆕 Verificar si el token expiró y renovarlo (solo en primer intento)
+            if (retryCount === 0 && isTokenExpired(accessToken)) {
+                console.log("⏰ Token expirado, intentando renovar...");
+                const renewed = await refreshAccessToken();
+                
+                if (!renewed) {
+                    console.error("❌ No se pudo renovar el token");
+                    isRedirecting = true;
+                    alert("🔒 Tu sesión ha expirado y no se pudo renovar.\n\nPor favor, inicia sesión nuevamente.\n\nRedirigiendo al login...");
+                    localStorage.clear();
+                    setTimeout(() => window.location.href = "./index.html", 3000);
+                    return;
+                }
+                // Actualizar el token después del refresh
+                accessToken = localStorage.getItem("accessToken");
+            }
+
+            try {
+                const res = await fetch(`${SCORE_API}/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":"application/json",
+                        "Authorization":`Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({game, score})
+                });
+                
+                if (res.status === 403 || res.status === 401) {
+                    console.error(`❌ Token inválido o expirado (intento ${retryCount + 1}/3)`);
+                    
+                    // Intentar renovar una vez más
+                    const renewed = await refreshAccessToken();
+                    if (renewed) {
+                        // Actualizar accessToken antes de reintentar
+                        accessToken = localStorage.getItem("accessToken");
+                        console.log("🔄 Reintentando con nuevo token...");
+                        
+                        // Reintentar guardar con nuevo token (incrementar contador)
+                        return saveScore(game, score, retryCount + 1);
+                    }
+                    
+                    isRedirecting = true;
+                    alert("🔒 Tu sesión ha expirado.\n\nPor favor, inicia sesión nuevamente.\n\nRedirigiendo al login...");
+                    localStorage.clear();
+                    setTimeout(() => window.location.href = "./index.html", 3000);
+                    return;
+                }
+                
+                const data = await res.json();
+                console.log("✅ Puntuación guardada:", data);
+                
+                // Actualizar el ranking después de guardar
+                await loadRanking(game);
+            } catch (err) {
+                console.error("Error al guardar puntuación:", err);
+            }
+        }
+
+        async function loadRanking(game) {
+            try {
+                currentRankingGame = game;
+                const res = await fetch(`${RANKING_API}/games/${game}`);
+                const data = await res.json();
+                
+                const title = JUEGOS_TITULOS[game] || game.toUpperCase();
+                document.getElementById("current-game").textContent = title;
+                
+                // Actualizar las pestañas activas
+                document.querySelectorAll(".ranking-tab").forEach(tab => {
+                    tab.classList.remove("active");
+                });
+                // 🟢 CORRECCIÓN: Usar el valor exacto del juego en el selector
+                document.querySelector(`[onclick="switchRanking('${game}')"]`).classList.add("active");
+                
+                // Actualizar la tabla
+                rankingBody.innerHTML = "";
+                if (data.length === 0) {
+                    rankingBody.innerHTML = '<tr><td colspan="4">No hay puntuaciones todavía</td></tr>';
+                } else {
+                    data.forEach((r, index) => {
+                        const position = index + 1;
+                        const emoji = position === 1 ? "🥇" : position === 2 ? "🥈" : position === 3 ? "🥉" : position;
+                        const rowClass = r.username === username ? 'class="my-score"' : '';
+                        const date = new Date(r.created_at).toLocaleString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Europe/Madrid'
+                        });
+                        rankingBody.innerHTML += `<tr ${rowClass}><td>${emoji}</td><td>${r.username}</td><td>${r.score}</td><td>${date}</td></tr>`;
+                    });
+                }
+            } catch (err) {
+                console.error("Error al cargar ranking:", err);
+                rankingBody.innerHTML = '<tr><td colspan="4">Servicio de rankings no disponible</td></tr>';
+            }
+        }
+
+        function switchRanking(game) {
+            loadRanking(game);
+        }
+
+        async function loadGame(game) {
+            console.log(`🎮 loadGame llamado con: ${game}`);
+            console.log(`📍 container actual:`, container);
+            
+            // 🛑 NO cargar juegos si estamos redirigiendo al login
+            if (isRedirecting) {
+                console.warn("⚠️ Redirigiendo al login, no se cargará el juego");
+                return;
+            }
+
+            // 🧹 LIMPIEZA COMPLETA antes de cargar nuevo juego
+            if (window.ciInstance) {
+                try {
+                    console.log("🧹 Limpiando instancia anterior de JS-DOS...");
+                    if (window.ciInstance.exit) {
+                        await window.ciInstance.exit();
+                    }
+                } catch (e) {
+                    console.warn("⚠️ Error al limpiar instancia:", e);
+                } finally {
+                    window.ciInstance = null;
+                }
+            }
+            
+            // Limpiar tracker anterior si existe
+            if (currentScoreSystem) {
+                try {
+                    currentScoreSystem.destroy();
+                } catch (e) {
+                    console.warn("⚠️ Error al destruir ScoreSystem:", e);
+                } finally {
+                    currentScoreSystem = null;
+                }
+            }
+            
+            // Limpiar completamente el contenedor DOM y recrear
+            const dosboxContainer = document.getElementById("dosbox-container");
+            // Remover todos los event listeners y contenido
+            dosboxContainer.innerHTML = '';
+            // Crear nuevo div dosbox limpio
+            const newDosbox = document.createElement('div');
+            newDosbox.id = 'dosbox';
+            newDosbox.style.display = 'none';
+            dosboxContainer.appendChild(newDosbox);
+            container = newDosbox; // 🆕 Reasignar la referencia global
+            
+            console.log(`📦 Container después de recrear:`, container);
+            
+            loader.textContent = `Cargando ${game.toUpperCase()}...`;
+            
+            // CDN URLs - Para testing local con docker-compose, usar puerto 8086
+            // En producción con Ingress, sería: https://cdn.gamehub.com
+            const CDN_URL = window.CDN_URL || 'http://localhost:8086/juegos';
+            
+            const JUEGOS_RUTAS = {
+                "doom": `${CDN_URL}/doom.jsdos`,
+                "wolf": `${CDN_URL}/wolf.jsdos`,
+                "dangerousdave2": `${CDN_URL}/dangerousdave2.jsdos`, 
+                "digger": `${CDN_URL}/digger.jsdos`,
+                "dukenukem3d": `${CDN_URL}/duke3d.jsdos`,
+                "heroesofmightandmagic2": `${CDN_URL}/heroesofmightandmagic2.jsdos`,
+                "lostvikings": `${CDN_URL}/lostvikings.jsdos`,
+                "mortalkombat": `${CDN_URL}/mortalkombat.jsdos`,
+                "streetfighter2": `${CDN_URL}/streetfighter2.jsdos`,
+                "tetris": `${CDN_URL}/tetris.jsdos` 
+            };
+
+            const url = JUEGOS_RUTAS[game] || "./juegos/default.jsdos";
+
+            // Cargar el ranking del juego que se va a jugar
+            await loadRanking(game);
+
+            try {
+                console.log(`🎮 Cargando juego desde: ${url}`);
+                console.log(`📦 Container antes de Dos():`, container);
+                
+                const ci = await Dos(container, {url, pathPrefix:"./jsdos/", mouseLock:true});
+                window.ciInstance = ci;
+                
+                console.log(`✅ Dos() ejecutado exitosamente`);
+                
+                // 🆕 Iniciar sistema híbrido de puntuación
+                currentScoreSystem = new HybridScoreSystem(game, ci);
+                console.log(`✅ Tracking de puntuación iniciado para ${game.toUpperCase()}`);
+                
+                loader.textContent = "";
+                container.style.display = "block";
+                
+                console.log(`📺 Container display establecido a 'block'`);
+
+                // 🆕 Guardar la función original de exit
+                const originalExit = ci.exit;
+                
+                ci.exit = async () => {
+                    console.log(`🏁 Juego terminado, calculando puntuación...`);
+                    
+                    // 🆕 Obtener puntuación (automática o manual según tiempo jugado)
+                    const score = await currentScoreSystem.getFinalScore();
+                    console.log(`📊 Puntuación final: ${score}`);
+                    
+                    // Guardar score solo si está logueado
+                    await saveScore(game, score);
+                    
+                    // Limpiar sistema de puntuación
+                    if (currentScoreSystem) {
+                        currentScoreSystem.destroy();
+                        currentScoreSystem = null;
+                    }
+                    
+                    // Llamar al exit original de JS-DOS
+                    if (originalExit) {
+                        try {
+                            await originalExit.call(ci);
+                        } catch (e) {
+                            console.warn("⚠️ Error en exit original:", e);
+                        }
+                    }
+                    
+                    // 🆕 Limpiar la instancia
+                    window.ciInstance = null;
+                    
+                    console.log("✅ Juego terminado y limpiado correctamente");
+                };
+                
+                console.log("✅ Juego cargado exitosamente");
+            } catch (err) {
+                loader.textContent = "";
+                console.error("❌ Error al cargar juego:", err);
+                alert(`Error al cargar ${game}: ${err.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

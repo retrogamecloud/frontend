@@ -1,0 +1,177 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gamehub-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: gamehub.rules
+      interval: 30s
+      rules:
+        # Pod restart alerts
+        - alert: GameHubPodRestarting
+          expr: rate(kube_pod_container_status_restarts_total{namespace="gamehub"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "Pod {{ $labels.pod }} is restarting frequently"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last 15 minutes."
+
+        - alert: GameHubPodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="gamehub"}[15m]) > 0.1
+          for: 10m
+          labels:
+            severity: critical
+            component: gamehub
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash looping"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is in a crash loop."
+
+        # High memory usage
+        - alert: GameHubHighMemoryUsage
+          expr: |
+            (sum(container_memory_usage_bytes{namespace="gamehub", container!="", container!="POD"}) by (pod, container)
+            /
+            sum(container_spec_memory_limit_bytes{namespace="gamehub", container!="", container!="POD"}) by (pod, container))
+            * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "High memory usage in {{ $labels.pod }}"
+            description: "Pod {{ $labels.pod }} container {{ $labels.container }} is using {{ $value | humanizePercentage }} of its memory limit."
+
+        - alert: GameHubCriticalMemoryUsage
+          expr: |
+            (sum(container_memory_usage_bytes{namespace="gamehub", container!="", container!="POD"}) by (pod, container)
+            /
+            sum(container_spec_memory_limit_bytes{namespace="gamehub", container!="", container!="POD"}) by (pod, container))
+            * 100 > 95
+          for: 2m
+          labels:
+            severity: critical
+            component: gamehub
+          annotations:
+            summary: "Critical memory usage in {{ $labels.pod }}"
+            description: "Pod {{ $labels.pod }} container {{ $labels.container }} is using {{ $value | humanizePercentage }} of its memory limit. OOM kill imminent."
+
+        # High CPU usage
+        - alert: GameHubHighCPUUsage
+          expr: |
+            (sum(rate(container_cpu_usage_seconds_total{namespace="gamehub", container!="", container!="POD"}[5m])) by (pod, container)
+            /
+            sum(container_spec_cpu_quota{namespace="gamehub", container!="", container!="POD"} / container_spec_cpu_period{namespace="gamehub", container!="", container!="POD"}) by (pod, container))
+            * 100 > 80
+          for: 10m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "High CPU usage in {{ $labels.pod }}"
+            description: "Pod {{ $labels.pod }} container {{ $labels.container }} is using {{ $value | humanizePercentage }} of its CPU limit."
+
+        # Pod not ready
+        - alert: GameHubPodNotReady
+          expr: sum by (namespace, pod) (kube_pod_status_phase{namespace="gamehub", phase!~"Running|Succeeded"}) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "Pod {{ $labels.pod }} is not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in a non-ready state for more than 5 minutes."
+
+        # HPA at max replicas
+        - alert: GameHubHPAMaxedOut
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="gamehub"}
+            >=
+            kube_horizontalpodautoscaler_spec_max_replicas{namespace="gamehub"}
+          for: 15m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "HPA {{ $labels.horizontalpodautoscaler }} is at maximum replicas"
+            description: "HPA {{ $labels.horizontalpodautoscaler }} has been running at maximum capacity ({{ $value }} replicas) for 15 minutes. Consider increasing max replicas."
+
+        # Deployment replicas mismatch
+        - alert: GameHubDeploymentReplicasMismatch
+          expr: |
+            kube_deployment_spec_replicas{namespace="gamehub"}
+            !=
+            kube_deployment_status_replicas_available{namespace="gamehub"}
+          for: 10m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "Deployment {{ $labels.deployment }} replicas mismatch"
+            description: "Deployment {{ $labels.deployment }} has not matched the expected number of replicas for 10 minutes."
+
+        # PVC almost full
+        - alert: GameHubPVCAlmostFull
+          expr: |
+            (kubelet_volume_stats_used_bytes{namespace="gamehub"}
+            /
+            kubelet_volume_stats_capacity_bytes{namespace="gamehub"})
+            * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            component: gamehub
+          annotations:
+            summary: "PVC {{ $labels.persistentvolumeclaim }} is almost full"
+            description: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value | humanizePercentage }} full."
+
+        # Service endpoint down
+        - alert: GameHubServiceEndpointDown
+          expr: kube_endpoint_address_available{namespace="gamehub"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: gamehub
+          annotations:
+            summary: "Service {{ $labels.endpoint }} has no available endpoints"
+            description: "Service {{ $labels.endpoint }} in namespace {{ $labels.namespace }} has no available endpoints for 5 minutes."
+
+    - name: gamehub.backend.rules
+      interval: 30s
+      rules:
+        # Auth service specific
+        - alert: GameHubAuthServiceDown
+          expr: up{job="auth-service", namespace="gamehub"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: auth-service
+          annotations:
+            summary: "Auth service is down"
+            description: "Auth service has been down for more than 2 minutes. Users cannot login."
+
+        # Score service specific
+        - alert: GameHubScoreServiceDown
+          expr: up{job="score-service", namespace="gamehub"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: score-service
+          annotations:
+            summary: "Score service is down"
+            description: "Score service has been down for more than 2 minutes. Score submissions are failing."
+
+        # Ranking service specific
+        - alert: GameHubRankingServiceDown
+          expr: up{job="ranking-service", namespace="gamehub"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: ranking-service
+          annotations:
+            summary: "Ranking service is down"
+            description: "Ranking service has been down for more than 2 minutes. Leaderboards are not updating."

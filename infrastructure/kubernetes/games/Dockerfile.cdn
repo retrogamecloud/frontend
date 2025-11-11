@@ -1,0 +1,18 @@
+# CDN Dockerfile - serves all game ROMs
+FROM nginx:1.25-alpine
+
+# Copy all .jsdos files
+COPY juegos/*.jsdos /usr/share/nginx/html/
+
+# Verify files were copied
+RUN ls -lh /usr/share/nginx/html/ && \
+    echo "Total games: $(ls /usr/share/nginx/html/*.jsdos | wc -l)"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+
+EXPOSE 8080
+
+LABEL maintainer="GameHub Team"
+LABEL description="CDN service for GameHub - serves game ROMs"

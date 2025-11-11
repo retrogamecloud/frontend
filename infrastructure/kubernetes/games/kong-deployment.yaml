@@ -1,0 +1,202 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: gamehub
+data:
+  kong.yml: |
+    _format_version: "3.0"
+
+    services:
+      - name: auth-service
+        url: http://auth-service:3001
+        routes:
+          - name: auth-routes
+            paths:
+              - /login
+              - /register
+              - /refresh
+              - /logout
+              - /verify
+              - /me
+              - /health
+            strip_path: false
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - OPTIONS
+              headers:
+                - Accept
+                - Authorization
+                - Content-Type
+                - Accept-Language
+                - X-Requested-With
+              exposed_headers:
+                - X-Auth-Token
+              credentials: true
+              max_age: 3600
+              preflight_continue: false
+
+      - name: ranking-service
+        url: http://ranking-service:3004
+        routes:
+          - name: ranking-routes
+            paths:
+              - /rankings
+            strip_path: true
+            methods:
+              - GET
+              - OPTIONS
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - OPTIONS
+              headers:
+                - Accept
+                - Authorization
+                - Content-Type
+              credentials: true
+              max_age: 3600
+
+      - name: score-service
+        url: http://score-service:3003
+        routes:
+          - name: score-routes
+            paths:
+              - /scores
+            strip_path: true
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - OPTIONS
+              headers:
+                - Accept
+                - Authorization
+                - Content-Type
+              credentials: true
+              max_age: 3600
+
+    plugins:
+      - name: prometheus
+        config:
+          status_code_metrics: true
+          latency_metrics: true
+          bandwidth_metrics: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: gamehub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      containers:
+      - name: kong
+        image: kong:3.4
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/etc/kong/kong.yml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001"
+        - name: KONG_PROXY_LISTEN
+          value: "0.0.0.0:8000"
+        - name: KONG_MEM_CACHE_SIZE
+          value: "64m"
+        - name: KONG_NGINX_WORKER_PROCESSES
+          value: "1"
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8001
+          name: admin
+        volumeMounts:
+        - name: kong-config
+          mountPath: /etc/kong
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong
+  namespace: gamehub
+spec:
+  type: ClusterIP
+  selector:
+    app: kong
+  ports:
+  - name: proxy
+    port: 8000
+    targetPort: 8000
+  - name: admin
+    port: 8001
+    targetPort: 8001

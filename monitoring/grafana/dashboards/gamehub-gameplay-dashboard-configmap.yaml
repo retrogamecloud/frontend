@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gamehub-gameplay-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  gamehub-gameplay-dashboard.json: |
+    {
+      "title": "GameHub - Gameplay & Monitoring",
+        "uid": "gamehub-gameplay",
+        "tags": ["gamehub", "gameplay", "monitoring"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "🎮 Active Alerts",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "ALERTS{namespace=\"gamehub\", alertstate=\"firing\"} OR ALERTS{alertname=~\"GameHub.*\", alertstate=\"firing\"}",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"x": 0, "y": 0, "w": 24, "h": 6},
+            "options": {
+              "showHeader": true
+            },
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "align": "left",
+                  "displayMode": "auto"
+                }
+              }
+            },
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "excludeByName": {
+                    "__name__": true,
+                    "Time": true,
+                    "Value": true,
+                    "alertstate": true,
+                    "prometheus": true
+                  },
+                  "renameByName": {
+                    "alertname": "Alert Name",
+                    "severity": "Severity",
+                    "username": "User",
+                    "game": "Game",
+                    "namespace": "Namespace",
+                    "pod": "Pod"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "🏆 Total Scores by Game",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(score_submissions_total) by (game)",
+                "legendFormat": "{{ game }}"
+              }
+            ],
+            "gridPos": {"x": 0, "y": 6, "w": 8, "h": 4},
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "orientation": "horizontal"
+            }
+          },
+          {
+            "id": 3,
+            "title": "👥 Total Scores by User",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(score_submissions_total) by (username)",
+                "legendFormat": "{{ username }}"
+              }
+            ],
+            "gridPos": {"x": 8, "y": 6, "w": 8, "h": 4},
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "orientation": "horizontal"
+            }
+          },
+          {
+            "id": 4,
+            "title": "📊 Score Submission Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(score_submissions_total[5m])) * 60",
+                "legendFormat": "Scores/min"
+              }
+            ],
+            "gridPos": {"x": 16, "y": 6, "w": 8, "h": 4},
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area"
+            }
+          },
+          {
+            "id": 5,
+            "title": "🎯 Latest Scores by User and Game",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "last_score_value",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"x": 0, "y": 10, "w": 12, "h": 8},
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "excludeByName": {
+                    "__name__": true,
+                    "Time": true,
+                    "user_id": true,
+                    "instance": true,
+                    "job": true,
+                    "namespace": true,
+                    "pod": true,
+                    "service": true
+                  },
+                  "renameByName": {
+                    "username": "👤 User",
+                    "game": "🎮 Game",
+                    "Value": "🏆 Score"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "📈 Score Submissions Over Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(increase(score_submissions_total[1m])) by (game)",
+                "legendFormat": "{{ game }}"
+              }
+            ],
+            "gridPos": {"x": 12, "y": 10, "w": 12, "h": 8}
+          },
+          {
+            "id": 7,
+            "title": "🏅 Top Scores",
+            "type": "bargauge",
+            "targets": [
+              {
+                "expr": "topk(10, last_score_value)",
+                "legendFormat": "{{ username }} - {{ game }}"
+              }
+            ],
+            "gridPos": {"x": 0, "y": 18, "w": 12, "h": 8},
+            "options": {
+              "displayMode": "gradient",
+              "orientation": "horizontal"
+            }
+          },
+          {
+            "id": 8,
+            "title": "💻 Pod CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"gamehub\",container!=\"\",container!=\"POD\"}[5m])) by (pod)",
+                "legendFormat": "{{ pod }}"
+              }
+            ],
+            "gridPos": {"x": 12, "y": 18, "w": 12, "h": 8},
+            "yaxes": [
+              {
+                "format": "percentunit",
+                "label": "CPU Usage"
+              }
+            ]
+          },
+          {
+            "id": 9,
+            "title": "💾 Pod Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace=\"gamehub\",container!=\"\",container!=\"POD\"}) by (pod)",
+                "legendFormat": "{{ pod }}"
+              }
+            ],
+            "gridPos": {"x": 0, "y": 26, "w": 12, "h": 8},
+            "yaxes": [
+              {
+                "format": "bytes",
+                "label": "Memory"
+              }
+            ]
+          },
+          {
+            "id": 10,
+            "title": "🔄 Pod Restarts",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"gamehub\"}) by (pod)",
+                "legendFormat": "{{ pod }}"
+              }
+            ],
+            "gridPos": {"x": 12, "y": 26, "w": 6, "h": 4},
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": 0, "color": "green"},
+                    {"value": 1, "color": "yellow"},
+                    {"value": 3, "color": "red"}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 11,
+            "title": "✅ Pod Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(kube_pod_status_phase{namespace=\"gamehub\",phase=\"Running\"}) by (pod)",
+                "legendFormat": "{{ pod }}"
+              }
+            ],
+            "gridPos": {"x": 18, "y": 26, "w": 6, "h": 4},
+            "options": {
+              "colorMode": "value",
+              "graphMode": "none"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": 0, "color": "red"},
+                    {"value": 1, "color": "green"}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 12,
+            "title": "⚠️ All GameHub Alerts",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(ALERTS{alertname=~\"GameHub.*\"}) by (alertname, severity)",
+                "legendFormat": "{{ alertname }}"
+              }
+            ],
+            "gridPos": {"x": 12, "y": 30, "w": 12, "h": 4},
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": 0, "color": "green"},
+                    {"value": 1, "color": "red"}
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }

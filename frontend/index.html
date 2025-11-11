@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Retro Game Hub - Iniciar Sesión</title>
+  <link rel="stylesheet" href="retro.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,
+  <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
+    <circle cx='32' cy='32' r='24' fill='black' stroke='%2300ff88' stroke-width='4'>
+      <animate attributeName='stroke-opacity' values='1;0.3;1' dur='2s' repeatCount='indefinite'/>
+    </circle>
+  </svg>">
+</head>
+<body>
+  <div class="grid"></div>
+
+  <div class="panel">
+    <h1>🕹️ RETRO GAME HUB</h1>
+
+    <div id="login">
+      <input id="username" placeholder="Usuario" />
+      <input id="password" type="password" placeholder="Contraseña" onkeypress="if(event.key==='Enter') login()" />
+      <button onclick="login()">Entrar</button>
+      <p onclick="toggleForm()">¿No tienes cuenta? Regístrate</p>
+    </div>
+
+    <div id="register" style="display:none;">
+      <input id="newUsername" placeholder="Elige un usuario" />
+      <input id="newPassword" type="password" placeholder="Elige una contraseña" onkeypress="if(event.key==='Enter') register()" />
+      <button onclick="register()">Registrar</button>
+      <p onclick="toggleForm()">¿Ya tienes cuenta? Inicia sesión</p>
+    </div>
+  </div>
+
+  <script>
+    // API Gateway URL (Kong)
+    const API = "http://localhost:8000/api/auth";
+
+    function toggleForm() {
+      document.getElementById("login").style.display =
+        document.getElementById("login").style.display === "none" ? "block" : "none";
+      document.getElementById("register").style.display =
+        document.getElementById("register").style.display === "none" ? "block" : "none";
+    }
+
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      
+      try {
+        const res = await fetch(`${API}/login`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({username, password})
+        });
+        
+        const data = await res.json();
+        
+        if (data.accessToken) {
+          localStorage.setItem("accessToken", data.accessToken);
+          localStorage.setItem("refreshToken", data.refreshToken);
+          localStorage.setItem("username", data.user.username);
+          localStorage.setItem("userId", data.user.id);
+          window.location.href = "./games.html";
+        } else {
+          alert("Error: " + (data.error || "usuario o contraseña incorrectos"));
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        alert("Error de conexión. Por favor, intenta de nuevo.");
+      }
+    }
+
+    async function register() {
+      const username = document.getElementById("newUsername").value;
+      const password = document.getElementById("newPassword").value;
+      
+      try {
+        const res = await fetch(`${API}/register`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({username, password})
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          alert("Cuenta creada correctamente. ¡Ahora puedes iniciar sesión!");
+          toggleForm();
+        } else {
+          alert("Error: " + (data.error || "No se pudo crear la cuenta"));
+        }
+      } catch (error) {
+        console.error("Register error:", error);
+        alert("Error de conexión. Por favor, intenta de nuevo.");
+      }
+    }
+  </script>
+</body>
+</html>

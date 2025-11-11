@@ -1,0 +1,61 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'gamehub'
+    environment: 'production'
+
+scrape_configs:
+  # Kong API Gateway
+  - job_name: 'kong'
+    static_configs:
+      - targets: ['kong:8001']
+    metrics_path: '/metrics'
+
+  # Auth Service
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:3001']
+    metrics_path: '/metrics'
+
+  # User Service
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:3002']
+    metrics_path: '/metrics'
+
+  # Score Service
+  - job_name: 'score-service'
+    static_configs:
+      - targets: ['score-service:3003']
+    metrics_path: '/metrics'
+
+  # Ranking Service
+  - job_name: 'ranking-service'
+    static_configs:
+      - targets: ['ranking-service:3004']
+    metrics_path: '/metrics'
+
+  # Game Catalog Service
+  - job_name: 'game-catalog-service'
+    static_configs:
+      - targets: ['game-catalog-service:3005']
+    metrics_path: '/metrics'
+
+  # PostgreSQL Exporters (if deployed)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: []
+    # Add postgres_exporter targets here
+
+  # Redis Exporter (if deployed)
+  - job_name: 'redis'
+    static_configs:
+      - targets: []
+    # Add redis_exporter targets here
+
+  # MongoDB Exporter (if deployed)
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: []
+    # Add mongodb_exporter targets here

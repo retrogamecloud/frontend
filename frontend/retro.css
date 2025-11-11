@@ -1,0 +1,390 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+/* === BASE RETRO 80s TERMINAL === */
+* { box-sizing: border-box; }
+
+body {
+    background: radial-gradient(circle at center, #001100 0%, #000000 100%);
+    font-family: 'VT323', monospace;
+    color: #00ff88;
+    text-shadow: 0 0 4px #00ff88;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    font-size: 1.3rem;
+    overflow-x: hidden;
+    /* 🟢 CORRECCIÓN: Se combinan las animaciones de arranque (boot) y parpadeo (crtFlicker) */
+    /* El orden es importante: la animación de crtFlicker (infinita) debe ir al final. */
+    animation: boot 2s ease-in forwards, crtFlicker 2s 2s infinite alternate;
+}
+
+/* === EFECTO PARPADEO CRT === */
+@keyframes crtFlicker {
+    0% { opacity: 0.99; }
+    50% { opacity: 1; }
+    100% { opacity: 0.98; }
+}
+
+/* === ANIMACIÓN DE ENCENDIDO (fade-in inicial) === */
+/* 'forwards' mantiene el estado final (opacity: 1) al terminar el fade-in */
+@keyframes boot {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+
+/* === EFECTO LÍNEAS CRT === */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 255, 136, 0.05),
+        rgba(0, 255, 136, 0.05) 1px,
+        transparent 2px,
+        transparent 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+    mix-blend-mode: overlay;
+}
+
+/* === REJILLA ANIMADA DE FONDO === */
+.grid {
+    /* Estas reglas son correctas y aseguran que se quede fijo */
+    position: fixed; 
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    
+    background-image:
+        linear-gradient(#004400 1px, transparent 1px),
+        linear-gradient(90deg, #004400 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: moveGrid 25s linear infinite;
+    z-index: -1;
+    pointer-events: none;
+}
+@keyframes moveGrid {
+    from { background-position: 0 0, 0 0; }
+    to { background-position: 40px 40px, 40px 40px; }
+}
+
+/* === CONTENEDORES === */
+.panel {
+    background: rgba(0, 20, 0, 0.9);
+    border: 2px solid #00ff88;
+    border-radius: 10px;
+    padding: 30px 50px;
+    box-shadow: 0 0 25px #00ff88;
+    z-index: 10;
+    display: inline-block;
+    position: relative;
+    margin-top: 100px;
+}
+
+/* === CABECERA === */
+header {
+    background: rgba(0, 20, 0, 0.9);
+    border-bottom: 2px solid #00ff88;
+    box-shadow: 0 0 25px #00ff88;
+    padding: 10px 0;
+    position: sticky; /* 🟢 CORRECCIÓN: Usar sticky para que se quede arriba */
+    top: 0;
+    z-index: 50; /* Aumentar z-index para asegurar que está por encima de todo */
+}
+h1 {
+    margin: 0;
+    font-size: 2.4rem;
+    text-shadow: 0 0 15px #00ff88;
+}
+
+/* === BOTONES === */
+.game-select {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin: 30px 0;
+    flex-wrap: wrap;
+}
+
+.game-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.game-thumb {
+    width: 300px;
+    height: 200px;
+    object-fit: cover;
+    border: 2px solid #00ff88;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+    transition: 0.3s;
+    cursor: pointer;
+}
+
+.game-thumb:hover {
+    box-shadow: 0 0 35px #00ff88;
+    transform: scale(1.05);
+}
+
+button {
+    background: transparent;
+    border: 2px solid #00ff88;
+    color: #00ff88;
+    font-family: inherit;
+    font-size: 1.4rem;
+    padding: 10px 25px;
+    margin: 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+button:hover {
+    background: #00ff88;
+    color: black;
+    box-shadow: 0 0 25px #00ff88;
+}
+.logout {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+}
+
+/* === INPUTS === */
+input {
+    background: black;
+    border: 2px solid #00ff88;
+    color: #00ff88;
+    font-family: inherit;
+    font-size: 1.3rem;
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 6px;
+    text-align: center;
+    z-index: 10;
+}
+input:focus {
+    outline: none;
+    box-shadow: 0 0 15px #00ff88;
+}
+
+/* === LOADER === */
+#loader {
+    font-size: 1.5rem;
+    animation: blink 1.5s infinite;
+    margin: 15px 0;
+}
+@keyframes blink {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* === DOSBOX CONTAINER === */
+#dosbox-container {
+    width: 80%;
+    height: 500px;
+    margin: 20px auto;
+    border: 2px solid #00ff88;
+    border-radius: 10px;
+    display: block;
+    box-shadow: 0 0 25px #00ff88;
+    z-index: 5;
+}
+
+/* === TABLAS === */
+#ranking {
+    width: 80%;
+    margin: 30px auto;
+    background: rgba(0, 20, 0, 0.8);
+    border: 2px solid #00ff88;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 20px #00ff88;
+}
+
+.ranking-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.ranking-tab {
+    background: transparent;
+    border: 2px solid #00ff88;
+    color: #00ff88;
+    font-family: inherit;
+    font-size: 1.2rem;
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: 0.3s;
+    border-radius: 6px;
+}
+
+.ranking-tab:hover {
+    background: rgba(0, 255, 136, 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+}
+
+.ranking-tab.active {
+    background: #00ff88;
+    color: black;
+    box-shadow: 0 0 20px #00ff88;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.3rem;
+    margin-top: 15px;
+}
+th, td {
+    border: 1px solid #00ff88;
+    padding: 10px;
+    text-align: center;
+}
+th {
+    background: rgba(0, 20, 0, 0.9);
+    text-shadow: 0 0 10px #00ff88;
+}
+td {
+    background: rgba(0, 10, 0, 0.6);
+}
+
+/* Resaltar la puntuación del usuario actual */
+tr.my-score {
+    background: rgba(0, 255, 136, 0.2) !important;
+    border: 2px solid #00ff88;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+}
+
+tr.my-score td {
+    background: transparent;
+    font-weight: bold;
+    text-shadow: 0 0 8px #00ff88;
+}
+
+/* === INSTRUCCIONES === */
+#instructions {
+    width: 70%;
+    margin: 50px auto;
+    text-align: left;
+    background: rgba(0, 20, 0, 0.8);
+    border: 2px solid #00ff88;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 20px #00ff88;
+}
+
+/* === LINKS Y TEXTOS === */
+p, a {
+    color: #00ff88;
+    text-decoration: underline;
+    cursor: pointer;
+}
+p:hover, a:hover {
+    color: #55ffaa;
+}
+
+/* === MODAL DE PUNTUACIÓN MANUAL (SECCIONES DE MODAL CONSOLIDADAS) === */
+
+#score-modal .modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#score-modal .modal-content {
+    background: rgba(0, 20, 0, 0.98);
+    border: 3px solid #00ff88;
+    border-radius: 15px;
+    padding: 40px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 0 60px #00ff88, inset 0 0 30px rgba(0, 255, 136, 0.1);
+    animation: slideDown 0.4s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+#score-modal h2 {
+    color: #00ff88;
+    text-shadow: 0 0 20px #00ff88;
+    margin-bottom: 15px;
+    font-size: 2rem;
+}
+
+#score-modal p {
+    color: #00ff88;
+    margin: 15px 0;
+    font-size: 1.2rem;
+}
+
+#score-modal input {
+    width: 100%;
+    font-size: 2.5rem;
+    padding: 20px;
+    margin: 25px 0;
+    background: black;
+    border: 3px solid #00ff88;
+    color: #00ff88;
+    text-align: center;
+    border-radius: 10px;
+    font-family: 'VT323', monospace;
+    text-shadow: 0 0 10px #00ff88;
+    transition: 0.3s;
+}
+
+#score-modal input:focus {
+    outline: none;
+    box-shadow: 0 0 25px #00ff88, inset 0 0 15px rgba(0, 255, 136, 0.2);
+    border-color: #55ffaa;
+}
+
+#score-modal .modal-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 25px;
+}
+
+#score-modal .modal-buttons button {
+    font-size: 1.4rem;
+    padding: 12px 30px;
+    min-width: 140px;
+}
+
+#score-modal .hint {
+    font-size: 1rem;
+    color: #55ffaa;
+    margin-top: 20px;
+    font-style: italic;
+    opacity: 0.8;
+}

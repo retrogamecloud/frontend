@@ -1,0 +1,77 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gamehub-gameplay-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: gamehub.gameplay
+      interval: 10s
+      rules:
+        # Alert when someone submits a score (plays a game)
+        - alert: GameHubNewScore
+          expr: |
+            increase(score_submissions_total[30s]) > 0
+          for: 0s
+          labels:
+            severity: warning
+            category: gameplay
+          annotations:
+            summary: "🎮 New game score submitted!"
+            description: |
+              Player: {{ $labels.username }}
+              Game: {{ $labels.game }}
+              Score: {{ printf "%.0f" $value }}
+              
+              Check detailed score at: http://localhost:8000/rankings
+            
+        # Alert for high scores (top 10%)
+        - alert: GameHubHighScore
+          expr: |
+            last_score_value > 5000
+          for: 0s
+          labels:
+            severity: warning
+            category: achievement
+          annotations:
+            summary: "🏆 High score achieved!"
+            description: |
+              Congratulations {{ $labels.username }}!
+              You scored {{ printf "%.0f" $value }} points in {{ $labels.game }}
+              
+              That's impressive! 🎉
+        
+        # Alert for new personal best
+        - alert: GameHubPersonalBest
+          expr: |
+            increase(score_submissions_total[1m]) > 0
+            and
+            last_score_value > 1000
+          for: 0s
+          labels:
+            severity: info
+            category: achievement
+          annotations:
+            summary: "🌟 Personal milestone reached!"
+            description: |
+              Player {{ $labels.username }} just scored {{ printf "%.0f" $value }} points in {{ $labels.game }}!
+              Keep up the great work!
+        
+        # Alert for gaming session activity
+        - alert: GameHubActiveSession
+          expr: |
+            sum(increase(score_submissions_total[5m])) by (username) > 3
+          for: 0s
+          labels:
+            severity: info
+            category: engagement
+          annotations:
+            summary: "🔥 Active gaming session detected!"
+            description: |
+              Player {{ $labels.username }} is on a gaming streak!
+              Multiple games played in the last 5 minutes.
+              
+              Total games: {{ printf "%.0f" $value }}

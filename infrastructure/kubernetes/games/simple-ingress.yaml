@@ -1,0 +1,91 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gamehub-ingress
+  namespace: gamehub
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: gamehub.local
+    http:
+      paths:
+      # Frontend principal (landing page)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: doom-game-service
+            port:
+              number: 8081
+      # Rutas específicas por juego
+      - path: /doom
+        pathType: Prefix
+        backend:
+          service:
+            name: doom-game-service
+            port:
+              number: 8081
+      - path: /wolf
+        pathType: Prefix
+        backend:
+          service:
+            name: wolf-game-service
+            port:
+              number: 8081
+      - path: /tetris
+        pathType: Prefix
+        backend:
+          service:
+            name: tetris-game-service
+            port:
+              number: 8081
+      - path: /mortalkombat
+        pathType: Prefix
+        backend:
+          service:
+            name: mortalkombat-game-service
+            port:
+              number: 8081
+      - path: /dangerousdave2
+        pathType: Prefix
+        backend:
+          service:
+            name: dangerousdave2-game-service
+            port:
+              number: 8081
+      - path: /digger
+        pathType: Prefix
+        backend:
+          service:
+            name: digger-game-service
+            port:
+              number: 8081
+      - path: /dukenukem3d
+        pathType: Prefix
+        backend:
+          service:
+            name: dukenukem3d-game-service
+            port:
+              number: 8081
+      - path: /heroesofmightandmagic2
+        pathType: Prefix
+        backend:
+          service:
+            name: heroesofmightandmagic2-game-service
+            port:
+              number: 8081
+      - path: /lostvikings
+        pathType: Prefix
+        backend:
+          service:
+            name: lostvikings-game-service
+            port:
+              number: 8081
+      - path: /streetfighter2
+        pathType: Prefix
+        backend:
+          service:
+            name: streetfighter2-game-service
+            port:
+              number: 8081

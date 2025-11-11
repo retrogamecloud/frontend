@@ -1,0 +1,149 @@
+{
+  "dashboard": {
+    "title": "GameHub - Services Overview",
+    "uid": "gamehub-services",
+    "tags": ["gamehub", "microservices"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"auth-service|score-service|ranking-service\"}",
+            "legendFormat": "{{ job }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 24, "h": 4},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=~\"auth-service|score-service|ranking-service\"}[5m])) by (job, method, status)",
+            "legendFormat": "{{ job }} - {{ method }} - {{ status }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8}
+      },
+      {
+        "id": 3,
+        "title": "HTTP Response Time (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~\"auth-service|score-service|ranking-service\"}[5m]))",
+            "legendFormat": "{{ job }} - p95"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8}
+      },
+      {
+        "id": 4,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=\"gamehub\",container=~\"auth-service|score-service|ranking-service\"}[5m])",
+            "legendFormat": "{{ container }}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8}
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{namespace=\"gamehub\",container=~\"auth-service|score-service|ranking-service\"}",
+            "legendFormat": "{{ container }}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8}
+      },
+      {
+        "id": 6,
+        "title": "Active Users (Auth Service)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "auth_active_sessions_total",
+            "legendFormat": "Active Sessions"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 20, "w": 6, "h": 4}
+      },
+      {
+        "id": 7,
+        "title": "Total Scores Submitted",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "score_submissions_total",
+            "legendFormat": "Total Scores"
+          }
+        ],
+        "gridPos": {"x": 6, "y": 20, "w": 6, "h": 4}
+      },
+      {
+        "id": 8,
+        "title": "Ranking Queries/sec",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(ranking_queries_total[1m])",
+            "legendFormat": "Queries/sec"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 20, "w": 6, "h": 4}
+      },
+      {
+        "id": 9,
+        "title": "Error Rate (%)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+            "legendFormat": "Error %"
+          }
+        ],
+        "gridPos": {"x": 18, "y": 20, "w": 6, "h": 4},
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}
