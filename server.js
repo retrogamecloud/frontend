@@ -30,7 +30,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-const PORT = 8081;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🎮 Frontend corriendo en http://localhost:${PORT}`);
 });
