@@ -112,10 +112,10 @@
     </section>
 
     <script>
-        // API URLs - All through Kong Gateway
-        const API = "http://localhost:8000/api/auth"; // auth-service through Kong
-        const SCORE_API = "http://localhost:8000/api/scores"; // score-service through Kong
-        const RANKING_API = "http://localhost:8000/api/rankings"; // ranking-service through Kong
+        // URLs de API - Todas a través de Kong Gateway
+        const API = "http://localhost:8000/api/auth"; // auth-service a través de Kong
+        const SCORE_API = "http://localhost:8000/api/scores"; // score-service a través de Kong
+        const RANKING_API = "http://localhost:8000/api/rankings"; // ranking-service a través de Kong
         
         let accessToken = localStorage.getItem("accessToken");
         const refreshToken = localStorage.getItem("refreshToken");
@@ -176,10 +176,10 @@
             "tetris": "Tetris"
         };
 
-        // Verificar si está logueado (opcional para jugar, pero necesario para guardar scores)
+        // Verificar si está autenticado (opcional para jugar, pero necesario para guardar puntuaciones)
         const isLoggedIn = !!accessToken;
         if (!isLoggedIn) {
-            console.warn("⚠️ No estás logueado. Puedes jugar pero no guardar puntuaciones.");
+            console.warn("⚠️ No estás autenticado. Puedes jugar pero no guardar puntuaciones.");
         }
 
         // Cargar ranking inicial al abrir la página
@@ -201,7 +201,7 @@
                 return;
             }
             
-            // Si no está logueado, no intentar guardar
+            // Si no está autenticado, no intentar guardar
             if (!accessToken) {
                 console.warn("⚠️ Debes iniciar sesión para guardar tu puntuación");
                 isRedirecting = true;
@@ -210,7 +210,7 @@
                 return;
             }
 
-            // 🆕 Verificar si el token expiró y renovarlo (solo en primer intento)
+            // 🆕 Verificar si el token expiró y renovarlo (solo en el primer intento)
             if (retryCount === 0 && isTokenExpired(accessToken)) {
                 console.log("⏰ Token expirado, intentando renovar...");
                 const renewed = await refreshAccessToken();
@@ -223,7 +223,7 @@
                     setTimeout(() => window.location.href = "./index.html", 3000);
                     return;
                 }
-                // Actualizar el token después del refresh
+                // Actualizar el token después de la renovación
                 accessToken = localStorage.getItem("accessToken");
             }
 
@@ -324,7 +324,7 @@
                 return;
             }
 
-            // 🧹 LIMPIEZA COMPLETA antes de cargar nuevo juego
+            // 🧹 Limpieza completa antes de cargar nuevo juego
             if (window.ciInstance) {
                 try {
                     console.log("🧹 Limpiando instancia anterior de JS-DOS...");
@@ -338,7 +338,7 @@
                 }
             }
             
-            // Limpiar tracker anterior si existe
+            // Limpiar rastreador de puntuación anterior si existe
             if (currentScoreSystem) {
                 try {
                     currentScoreSystem.destroy();
@@ -364,7 +364,7 @@
             
             loader.textContent = `Cargando ${game.toUpperCase()}...`;
             
-            // CDN URLs - Para testing local con docker-compose, usar puerto 8086
+            // URLs del CDN - Para pruebas locales con docker-compose, usar puerto 8086
             // En producción con Ingress, sería: https://cdn.gamehub.com
             const CDN_URL = window.CDN_URL || 'http://localhost:8086/juegos';
             
@@ -397,14 +397,14 @@
                 
                 // 🆕 Iniciar sistema híbrido de puntuación
                 currentScoreSystem = new HybridScoreSystem(game, ci);
-                console.log(`✅ Tracking de puntuación iniciado para ${game.toUpperCase()}`);
+                console.log(`✅ Rastreo de puntuación iniciado para ${game.toUpperCase()}`);
                 
                 loader.textContent = "";
                 container.style.display = "block";
                 
                 console.log(`📺 Container display establecido a 'block'`);
 
-                // 🆕 Guardar la función original de exit
+                // 🆕 Guardar la función original de salida
                 const originalExit = ci.exit;
                 
                 ci.exit = async () => {
@@ -414,7 +414,7 @@
                     const score = await currentScoreSystem.getFinalScore();
                     console.log(`📊 Puntuación final: ${score}`);
                     
-                    // Guardar score solo si está logueado
+                    // Guardar puntuación solo si está autenticado
                     await saveScore(game, score);
                     
                     // Limpiar sistema de puntuación
@@ -423,7 +423,7 @@
                         currentScoreSystem = null;
                     }
                     
-                    // Llamar al exit original de JS-DOS
+                    // Llamar a la función original de salida de JS-DOS
                     if (originalExit) {
                         try {
                             await originalExit.call(ci);
