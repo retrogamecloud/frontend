@@ -1,13 +1,24 @@
-# Frontend para GameHub - Modo Microservicios
-FROM node:20-alpine
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copiar package.json
+COPY package*.json ./
+
+# Instalar dependencias
+RUN npm ci --omit=dev --no-fund --no-audit --loglevel=error && npm cache clean --force
+
+# Production stage
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
 # Copiar package.json
 COPY package.json ./
 
-# Instalar dependencias
-RUN npm install --production
+# Copiar node_modules desde builder
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copiar código fuente
 COPY . ./
