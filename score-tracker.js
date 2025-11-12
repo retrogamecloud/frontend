@@ -16,13 +16,53 @@ class GameScoreTracker {
 		this.config = {
 			doom: {
 				actionKeys: ['Control', 'Space', 'Shift', '1', '2', '3', '4', '5', '6', '7'],
-				timeMultiplier: 10, // puntos por segundo
-				actionMultiplier: 5 // puntos por acción
+				timeMultiplier: 10,
+				actionMultiplier: 5
 			},
 			wolf: {
 				actionKeys: ['Control', 'Space', 'Shift', 'Alt'],
 				timeMultiplier: 8,
 				actionMultiplier: 6
+			},
+			dangerousdave2: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'],
+				timeMultiplier: 7,
+				actionMultiplier: 4
+			},
+			digger: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'],
+				timeMultiplier: 6,
+				actionMultiplier: 3
+			},
+			dukenukem3d: {
+				actionKeys: ['Control', 'Space', 'Shift', 'Alt', '1', '2', '3', '4', '5', '6', '7'],
+				timeMultiplier: 9,
+				actionMultiplier: 5
+			},
+			heroesofmightandmagic2: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Space'],
+				timeMultiplier: 5,
+				actionMultiplier: 2
+			},
+			lostvikings: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Control'],
+				timeMultiplier: 7,
+				actionMultiplier: 4
+			},
+			mortalkombat: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'A', 'S', 'D', 'F', 'Enter', 'Space'],
+				timeMultiplier: 8,
+				actionMultiplier: 6
+			},
+			streetfighter2: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'A', 'S', 'D', 'F', 'Enter', 'Space'],
+				timeMultiplier: 8,
+				actionMultiplier: 6
+			},
+			tetris: {
+				actionKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'],
+				timeMultiplier: 4,
+				actionMultiplier: 2
 			}
 		};
 
@@ -186,8 +226,8 @@ class HybridScoreSystem {
 
 		console.log(`📊 Estadísticas de juego:`, stats);
 
-		// Si jugó más de 2 minutos (120 segundos), usar puntuación automática
-		if (stats.timePlayedSeconds >= 120) {
+		// Si jugó más de 30 segundos, usar puntuación automática
+		if (stats.timePlayedSeconds >= 30) {
 			console.log(`⏱️ Tiempo suficiente (${stats.timePlayedSeconds}s) - Usando puntuación automática: ${stats.score}`);
 			return stats.score;
 		}
