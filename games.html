@@ -403,6 +403,28 @@
                 container.style.display = "block";
                 
                 console.log(`📺 Container display establecido a 'block'`);
+                
+                // 🚀 Simular clic en el botón play después de un breve delay
+                setTimeout(() => {
+                    const playButton = container.querySelector('button, .dos-play-button, [class*="play"]');
+                    if (playButton) {
+                        // Intentar múltiples métodos de clic
+                        if (typeof playButton.click === 'function') {
+                            playButton.click();
+                        } else {
+                            // Simular eventos de mouse manualmente
+                            const clickEvent = new MouseEvent('click', {
+                                view: window,
+                                bubbles: true,
+                                cancelable: true
+                            });
+                            playButton.dispatchEvent(clickEvent);
+                        }
+                        console.log(`✅ Juego arrancado automáticamente`);
+                    } else {
+                        console.log(`⚠️ No se encontró botón de play para autoarranque`);
+                    }
+                }, 500);
 
                 // 🆕 Guardar la función original de salida
                 const originalExit = ci.exit;
