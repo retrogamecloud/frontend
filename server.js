@@ -22,7 +22,7 @@ const projectRoot = path.resolve(__dirname, '..');
 app.use(express.static(__dirname));
 
 // 2. 🟢 AÑADIDO: Servir la carpeta 'juegos' bajo la ruta URL '/juegos'.
-// Esto permite que el path relativo '../juegos/...' funcione correctamente.
+// Esto permite que la ruta relativa '../juegos/...' funcione correctamente.
 app.use('/juegos', express.static(path.join(projectRoot, 'juegos')));
 
 // Health check endpoint para Kubernetes

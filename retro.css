@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
-/* === BASE RETRO 80s TERMINAL === */
+/* === TERMINAL RETRO ESTILO AÑOS 80 === */
 * { box-sizing: border-box; }
 
 body {
@@ -25,7 +25,7 @@ body {
     100% { opacity: 0.98; }
 }
 
-/* === ANIMACIÓN DE ENCENDIDO (fade-in inicial) === */
+/* === ANIMACIÓN DE ENCENDIDO (efecto fade-in inicial) === */
 /* 'forwards' mantiene el estado final (opacity: 1) al terminar el fade-in */
 @keyframes boot {
     0% { opacity: 0; }
@@ -53,7 +53,7 @@ body::before {
 
 /* === REJILLA ANIMADA DE FONDO === */
 .grid {
-    /* Estas reglas son correctas y aseguran que se quede fijo */
+    /* Estas reglas son correctas y aseguran que se quede fija */
     position: fixed; 
     top: 0; left: 0;
     width: 100%; height: 100%;
@@ -292,7 +292,7 @@ p:hover, a:hover {
     color: #55ffaa;
 }
 
-/* === MODAL DE PUNTUACIÓN MANUAL (SECCIONES DE MODAL CONSOLIDADAS) === */
+/* === MODAL DE PUNTUACIÓN MANUAL === */
 
 #score-modal .modal-overlay {
     position: fixed;

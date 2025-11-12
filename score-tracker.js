@@ -1,7 +1,7 @@
 // score-tracker.js - Sistema Híbrido de Puntuación
 
 /**
- * Sistema de Tracking Automático de Puntuación
+ * Sistema de Rastreo Automático de Puntuación
  * Calcula puntos basándose en tiempo de juego y acciones realizadas
  */
 class GameScoreTracker {
@@ -53,7 +53,7 @@ class GameScoreTracker {
 		// Fórmula: (tiempo * multiplicador) + (acciones * multiplicador)
 		const timeScore = timeInSeconds * gameConfig.timeMultiplier;
 		const actionScore = this.actionCount * gameConfig.actionMultiplier;
-		const varietyBonus = this.keyPresses.size * 50; // Bonus por usar diferentes acciones
+		const varietyBonus = this.keyPresses.size * 50; // Bonificación por usar diferentes acciones
 
 		return Math.max(0, timeScore + actionScore + varietyBonus);
 	}
@@ -92,7 +92,7 @@ class ManualScoreEntry {
         <div class="modal-content">
           <h2>🎮 Registrar Puntuación - ${game.toUpperCase()}</h2>
           <p>Introduce tu puntuación final del juego:</p>
-          <!-- 🔴 CAMBIO CLAVE: Usamos type="text" para permitir la entrada del teclado -->
+          <!-- 🔴 CAMBIO CLAVE: Usamos type="text" para permitir la entrada desde el teclado -->
           <input type="text" id="manual-score" min="0" placeholder="0" pattern="[0-9]*" inputmode="numeric" />
           <div class="modal-buttons">
             <button onclick="window.submitManualScore()">✅ Guardar</button>
@@ -117,7 +117,7 @@ class ManualScoreEntry {
 			scoreInput.addEventListener('input', filterInput);
 		}
 
-		// Enfocar el input
+		// Enfocar el campo de entrada
 		setTimeout(() => {
 			if (scoreInput) scoreInput.focus();
 		}, 100);
@@ -143,7 +143,7 @@ class ManualScoreEntry {
 			delete window.closeScoreModal;
 		};
 
-		// Permitir guardar con Enter
+		// Permitir guardar con la tecla Enter
 		if (scoreInput) {
 			scoreInput.addEventListener('keypress', (e) => {
 				if (e.key === 'Enter') {
@@ -155,7 +155,7 @@ class ManualScoreEntry {
 }
 
 /**
- * Sistema Híbrido: Combina tracking automático + entrada manual
+ * Sistema Híbrido: Combina rastreo automático + entrada manual
  */
 class HybridScoreSystem {
 	constructor(game, dosInstance) {
@@ -186,7 +186,7 @@ class HybridScoreSystem {
 
 		console.log(`📊 Estadísticas de juego:`, stats);
 
-		// Si jugó más de 2 minutos (120 segundos), usar score automático
+		// Si jugó más de 2 minutos (120 segundos), usar puntuación automática
 		if (stats.timePlayedSeconds >= 120) {
 			console.log(`⏱️ Tiempo suficiente (${stats.timePlayedSeconds}s) - Usando puntuación automática: ${stats.score}`);
 			return stats.score;
