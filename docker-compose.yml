@@ -120,7 +120,7 @@ services:
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
       KONG_PROXY_LISTEN: 0.0.0.0:8000, 0.0.0.0:8443 ssl
     volumes:
-      - ./kong:/kong:ro
+      - ../kong:/kong:ro
     ports:
       - "8000:8000"
       - "8445:8443"
