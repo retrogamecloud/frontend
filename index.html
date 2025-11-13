@@ -51,14 +51,13 @@
         const res = await fetch(`${API}/login`, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({username, password})
+          body: JSON.stringify({username, password_hash: password})
         });
         
         const data = await res.json();
         
-        if (data.accessToken) {
+        if (res.ok && data.accessToken) {
           localStorage.setItem("accessToken", data.accessToken);
-          localStorage.setItem("refreshToken", data.refreshToken);
           localStorage.setItem("username", data.user.username);
           localStorage.setItem("userId", data.user.id);
           window.location.href = "./games.html";
@@ -79,7 +78,7 @@
         const res = await fetch(`${API}/register`, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({username, password})
+          body: JSON.stringify({username, password_hash: password})
         });
         
         const data = await res.json();
@@ -88,7 +87,11 @@
           alert("Cuenta creada correctamente. ¡Ahora puedes iniciar sesión!");
           toggleForm();
         } else {
-          alert("Error: " + (data.error || "No se pudo crear la cuenta"));
+          if (data.error && data.error.includes("duplicate key value")) {
+            alert("Error: El usuario ya existe. Por favor, elige otro nombre de usuario.");
+          } else {
+            alert("Error: " + (data.error || "No se pudo crear la cuenta"));
+          }
         }
       } catch (error) {
         console.error("Register error:", error);
