@@ -127,6 +127,27 @@
         let currentRankingGame = "doom";
         let currentScoreSystem = null;
         let isRedirecting = false; // 🆕 Flag para evitar cargas durante redirección
+        
+        // 🔊 Rastrear AudioContexts para poder cerrarlos
+        const activeAudioContexts = [];
+        
+        // Interceptar creación de AudioContext
+        (function() {
+            const OriginalAudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!OriginalAudioContext) return;
+            
+            const AudioContextProxy = function(...args) {
+                const ctx = new OriginalAudioContext(...args);
+                activeAudioContexts.push(ctx);
+                console.log(`🔊 AudioContext creado. Total: ${activeAudioContexts.length}`);
+                return ctx;
+            };
+            AudioContextProxy.prototype = OriginalAudioContext.prototype;
+            window.AudioContext = AudioContextProxy;
+            if (window.webkitAudioContext) {
+                window.webkitAudioContext = AudioContextProxy;
+            }
+        })();
 
         // 🆕 Función para verificar si el token está expirado
         function isTokenExpired(token) {
@@ -330,19 +351,94 @@
                 return;
             }
 
-            // 🧹 Limpieza completa antes de cargar nuevo juego
+            // 🧹 Limpieza NUCLEAR - destruir TODO para forzar limpieza de audio
             if (window.ciInstance) {
                 try {
-                    console.log("🧹 Limpiando instancia anterior de JS-DOS...");
-                    if (window.ciInstance.exit) {
-                        await window.ciInstance.exit();
+                    console.log("🔥 Destruyendo instancia completa de JS-DOS...");
+                    
+                    // 🔇 Cerrar TODOS los AudioContext rastreados
+                    console.log(`🔍 Intentando cerrar ${activeAudioContexts.length} AudioContexts rastreados...`);
+                    for (let i = activeAudioContexts.length - 1; i >= 0; i--) {
+                        const ctx = activeAudioContexts[i];
+                        try {
+                            if (ctx && ctx.state !== 'closed') {
+                                console.log(`🔇 Cerrando AudioContext #${i} (estado: ${ctx.state})`);
+                                await ctx.close();
+                                console.log(`✅ AudioContext #${i} cerrado`);
+                            }
+                            activeAudioContexts.splice(i, 1);
+                        } catch (e) {
+                            console.warn(`⚠️ Error cerrando AudioContext #${i}:`, e);
+                        }
                     }
+                    
+                    if (activeAudioContexts.length === 0) {
+                        console.log("✅ Todos los AudioContext cerrados");
+                    } else {
+                        console.warn(`⚠️ Quedan ${activeAudioContexts.length} AudioContext sin cerrar`);
+                    }
+                    
+                    await window.ciInstance.exit();
                 } catch (e) {
-                    console.warn("⚠️ Error al limpiar instancia:", e);
+                    console.warn("⚠️ Error al hacer exit:", e);
                 } finally {
                     window.ciInstance = null;
                 }
             }
+            
+            // 💣 DESTRUIR COMPLETAMENTE el canvas y todos sus hijos
+            const dosboxDiv = document.getElementById('dosbox');
+            if (dosboxDiv) {
+                // Destruir TODO lo que hay dentro (canvas, audio, etc)
+                while (dosboxDiv.firstChild) {
+                    dosboxDiv.removeChild(dosboxDiv.firstChild);
+                }
+                // Limpiar atributos
+                dosboxDiv.innerHTML = '';
+            }
+            
+            // Destruir elementos audio/video en TODO el documento
+            document.querySelectorAll('audio, video, canvas').forEach(el => {
+                try {
+                    if (el.pause) el.pause();
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                } catch (e) {}
+            });
+            
+            // Esperar más tiempo para que se liberen recursos de audio
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // 🔥 DESTRUCCIÓN COMPLETA del contenedor para limpiar todo
+            const dosboxContainer = document.getElementById("dosbox-container");
+            const parent = dosboxContainer.parentNode;
+            const nextSibling = dosboxContainer.nextSibling;
+            
+            // Eliminar completamente el contenedor del DOM
+            parent.removeChild(dosboxContainer);
+            
+            // Esperar un momento para que el navegador limpie
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Recrear el contenedor desde cero
+            const newContainer = document.createElement('div');
+            newContainer.id = 'dosbox-container';
+            newContainer.style.width = '80%';
+            newContainer.style.height = '500px';
+            newContainer.style.margin = '20px auto';
+            newContainer.style.border = '2px solid #00ff88';
+            newContainer.style.borderRadius = '10px';
+            newContainer.style.display = 'block';
+            newContainer.style.boxShadow = '0 0 25px #00ff88';
+            newContainer.style.zIndex = '5';
+            newContainer.style.position = 'relative';
+            newContainer.style.background = '#000';
+            
+            const newDosbox = document.createElement('div');
+            newDosbox.id = 'dosbox';
+            newContainer.appendChild(newDosbox);
+            
+            parent.insertBefore(newContainer, nextSibling);
+            container = newDosbox;
             
             // Limpiar rastreador de puntuación anterior si existe
             if (currentScoreSystem) {
@@ -355,17 +451,7 @@
                 }
             }
             
-            // Limpiar completamente el contenedor DOM y recrear
-            const dosboxContainer = document.getElementById("dosbox-container");
-            // Remover todos los event listeners y contenido
-            dosboxContainer.innerHTML = '';
-            // Crear nuevo div dosbox limpio
-            const newDosbox = document.createElement('div');
-            newDosbox.id = 'dosbox';
-            dosboxContainer.appendChild(newDosbox);
-            container = newDosbox; // 🆕 Reasignar la referencia global
-            
-            console.log(`📦 Container después de recrear:`, container);
+            console.log(`📦 Container listo después de recrear desde cero:`, container);
             
             loader.textContent = `Cargando ${game.toUpperCase()}...`;
             

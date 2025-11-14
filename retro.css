@@ -202,7 +202,7 @@ input:focus {
 #dosbox {
     width: 100%;
     height: 100%;
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect fill="%23001100" width="800" height="500"/><text x="400" y="170" font-family="monospace" font-size="30" fill="%2300ff88" text-anchor="middle">🎮 Retro Game Hub</text><text x="400" y="215" font-family="monospace" font-size="19" fill="%2300ff88" text-anchor="middle" opacity="0.7">Selecciona un juego para comenzar</text><circle cx="400" cy="300" r="38" fill="none" stroke="%2300ff88" stroke-width="3" opacity="0.5"><animate attributeName="r" values="38;48;38" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite"/></circle></svg>');
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice"><rect fill="%23001100" width="800" height="500"/><text x="400" y="180" font-family="monospace" font-size="16" fill="%2300ff88" text-anchor="middle">🎮 Retro Game Hub</text><text x="400" y="202" font-family="monospace" font-size="11" fill="%2300ff88" text-anchor="middle" opacity="0.7">Selecciona un juego para comenzar</text><circle cx="400" cy="280" r="28" fill="none" stroke="%2300ff88" stroke-width="2" opacity="0.5"><animate attributeName="r" values="28;38;28" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite"/></circle></svg>'); /* v1763120200 */
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -400,3 +400,4 @@ p:hover, a:hover {
     opacity: 0.8;
 }/* Update 1763110797 */
 /* Update 1763110797 */
+/* CACHE BUST 1763118000 */
