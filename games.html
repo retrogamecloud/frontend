@@ -71,7 +71,7 @@
 
     <div id="loader"></div>
     <div id="dosbox-container">
-        <div id="dosbox" style="display: none;"></div>
+        <div id="dosbox"></div>
     </div>
 
     <section id="ranking">
@@ -362,7 +362,6 @@
             // Crear nuevo div dosbox limpio
             const newDosbox = document.createElement('div');
             newDosbox.id = 'dosbox';
-            newDosbox.style.display = 'none';
             dosboxContainer.appendChild(newDosbox);
             container = newDosbox; // 🆕 Reasignar la referencia global
             
@@ -406,9 +405,8 @@
                 console.log(`✅ Rastreo de puntuación iniciado para ${game.toUpperCase()}`);
                 
                 loader.textContent = "";
-                container.style.display = "block";
                 
-                console.log(`📺 Container display establecido a 'block'`);
+                console.log(`📺 Canvas listo para mostrar el juego`);
                 
                 // 🚀 Simular clic en el botón play después de un breve delay
                 setTimeout(() => {
