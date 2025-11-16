@@ -114,7 +114,7 @@
     <script>
         // URLs de API - Todas a través de Kong Gateway
         const API = "http://localhost:8000/api/auth"; // auth-service a través de Kong
-        const SCORE_API = "http://localhost:8000/api/scores"; // score-service a través de Kong
+        const SCORE_API = "http://localhost:8000/api/scores/"; // score-service a través de Kong (¡con barra!)
         const RANKING_API = "http://localhost:8000/api/rankings"; // ranking-service a través de Kong
         
         let accessToken = localStorage.getItem("accessToken");
