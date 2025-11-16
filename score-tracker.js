@@ -248,4 +248,4 @@ window.GameScoreTracker = GameScoreTracker;
 window.ManualScoreEntry = ManualScoreEntry;
 window.HybridScoreSystem = HybridScoreSystem;
 
-console.log('✅ Sistema híbrido de puntuación cargado');
+console.log('✅ Sistema híbrido de puntuación cargado');const test = true;
