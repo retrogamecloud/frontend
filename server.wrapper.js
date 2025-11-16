@@ -5,11 +5,15 @@
 // ============================================================================
 
 import { getDirname } from "./src/config/paths.js";
-import { createApp, startServer } from "./server.refactored.js";
+import { createApp } from "./server.refactored.js";
 
 const __dirname = getDirname(import.meta.url);
 const PORT = process.env.PORT || 8080;
 
-// Crear y iniciar aplicación
+// Crear aplicación
 const app = createApp(__dirname);
-startServer(app, PORT);
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`🎮 Frontend corriendo en http://localhost:${PORT}`);
+});
