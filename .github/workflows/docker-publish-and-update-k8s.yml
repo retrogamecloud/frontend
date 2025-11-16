@@ -7,6 +7,12 @@ on:
     paths-ignore:
       - '**.md'
       - '.gitignore'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
 
 env:
   REGISTRY_GHCR: ghcr.io
