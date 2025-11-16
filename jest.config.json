@@ -1,0 +1,22 @@
+{
+  "testEnvironment": "node",
+  "testMatch": [
+    "**/tests/**/*.test.js"
+  ],
+  "collectCoverageFrom": [
+    "server.js",
+    "score-tracker.js",
+    "!node_modules/**"
+  ],
+  "coverageThreshold": {
+    "global": {
+      "branches": 40,
+      "functions": 40,
+      "lines": 40,
+      "statements": 40
+    }
+  },
+  "coverageReporters": ["text", "lcov", "html"],
+  "verbose": true,
+  "testTimeout": 10000
+}
