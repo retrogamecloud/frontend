@@ -100,7 +100,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/retrogamecloud/frontend
+            retrogamehub/frontend
             retrogamehub/frontend
           tags: |
             type=raw,value=latest
@@ -156,10 +156,10 @@ jobs:
           VERSION="${{ steps.image_info.outputs.version }}"
           
           # Actualizar la imagen en el manifiesto usando sed
-          sed -i "s|image: ghcr.io/retrogamecloud/frontend:.*|image: ghcr.io/retrogamecloud/frontend:${IMAGE_TAG}|g" ${{ env.K8S_MANIFEST_FILE }}
+          sed -i "s|image: retrogamehub/frontend:.*|image: retrogamehub/frontend:${IMAGE_TAG}|g" ${{ env.K8S_MANIFEST_FILE }}
           
           # Actualizar el comentario con la versión
-          sed -i "s|# Imagen del frontend desde GHCR.*|# Imagen del frontend desde GHCR - ${VERSION} (${IMAGE_TAG})|g" ${{ env.K8S_MANIFEST_FILE }}
+          sed -i "s|# Imagen del frontend desde DockerHub.*|# Imagen del frontend desde DockerHub - ${VERSION} (${IMAGE_TAG})|g" ${{ env.K8S_MANIFEST_FILE }}
           
           echo "✅ Manifiesto actualizado con imagen: ${IMAGE_TAG}"
 
