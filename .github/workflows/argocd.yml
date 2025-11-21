@@ -11,9 +11,7 @@ on:
       - develop
 
 env:
-  DOCKERHUB_USERNAME: retrogamecloud
   GHCR_REGISTRY: ghcr.io
-  DOCKERHUB_IMAGE: retrogamecloud/frontend
   GHCR_IMAGE: ghcr.io/retrogamecloud/frontend
 
 jobs:
@@ -33,7 +31,7 @@ jobs:
       - name: Login en Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login en GitHub Container Registry
@@ -56,9 +54,9 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.DOCKERHUB_IMAGE }}:latest
-            ${{ env.DOCKERHUB_IMAGE }}:sha-${{ steps.meta.outputs.sha_short }}
-            ${{ env.DOCKERHUB_IMAGE }}:${{ steps.meta.outputs.branch }}-${{ steps.meta.outputs.date }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/frontend:sha-${{ steps.meta.outputs.sha_short }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ steps.meta.outputs.branch }}-${{ steps.meta.outputs.date }}
           cache-from: type=registry,ref=${{ env.DOCKERHUB_IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.DOCKERHUB_IMAGE }}:buildcache,mode=max
 
