@@ -20,6 +20,8 @@ env:
   IMAGE_NAME: retrogamecloud/frontend
   K8S_REPO: retrogamecloud/kubernetes
   K8S_MANIFEST_FILE: 04-frontend.yaml
+  INFRASTRUCTURE_REPO: retrogamecloud/infrastructure
+  INFRASTRUCTURE_MANIFEST_FILE: k8s/frontend/deployment.yaml
 
 jobs:
   test:
@@ -212,3 +214,85 @@ jobs:
           echo "- **Tag de imagen**: ${{ steps.image_info.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Manifiesto actualizado**: ${{ env.K8S_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Repositorio**: ${{ env.K8S_REPO }}" >> $GITHUB_STEP_SUMMARY
+
+  update-infrastructure-manifest:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Clonar repositorio de Infrastructure
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.INFRASTRUCTURE_REPO }}
+          token: ${{ secrets.K8S_UPDATE_TOKEN }}
+          ref: main
+
+      - name: Obtener información de la imagen
+        id: image_info
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_COUNT=${{ github.run_number }}
+          VERSION="v1.0.${COMMIT_COUNT}"
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Actualizar deployment de Infrastructure
+        run: |
+          IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
+          VERSION="${{ steps.image_info.outputs.version }}"
+          
+          # Actualizar la imagen en el deployment
+          sed -i "s|image: retrogamehub/frontend:.*|image: retrogamehub/frontend:${IMAGE_TAG}|g" ${{ env.INFRASTRUCTURE_MANIFEST_FILE }}
+          
+          echo "✅ Deployment actualizado con imagen: ${IMAGE_TAG}"
+
+      - name: Configurar Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Crear rama y PR con cambios en Infrastructure
+        run: |
+          VERSION="${{ steps.image_info.outputs.version }}"
+          IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
+          BRANCH_NAME="auto/frontend-${IMAGE_TAG}"
+          
+          git add ${{ env.INFRASTRUCTURE_MANIFEST_FILE }}
+          
+          if git diff --staged --quiet; then
+            echo "No hay cambios en el deployment"
+          else
+            git checkout -b "${BRANCH_NAME}"
+            
+            git commit -m "chore: Actualizar imagen de frontend a ${IMAGE_TAG}" \
+                       -m "Version: ${VERSION}" \
+                       -m "SHA: ${{ steps.image_info.outputs.short_sha }}" \
+                       -m "Commit origen: ${{ github.sha }}" \
+                       -m "Actualizacion automatica desde CI/CD del repositorio frontend"
+            
+            git push origin "${BRANCH_NAME}"
+            
+            gh pr create \
+              --repo ${{ env.INFRASTRUCTURE_REPO }} \
+              --base main \
+              --head "${BRANCH_NAME}" \
+              --title "chore(frontend): Actualizar a ${IMAGE_TAG}" \
+              --body "Actualizacion automatica de frontend - Version: ${VERSION}, Tag: ${IMAGE_TAG}, SHA: ${{ steps.image_info.outputs.short_sha }}, Commit: ${{ github.sha }}"
+            
+            echo "✅ PR creado en el repositorio de Infrastructure"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.K8S_UPDATE_TOKEN }}
+
+      - name: Resumen Infrastructure
+        run: |
+          echo "## Actualizacion de Infrastructure Completada" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.image_info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag de imagen**: ${{ steps.image_info.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Manifiesto actualizado**: ${{ env.INFRASTRUCTURE_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repositorio**: ${{ env.INFRASTRUCTURE_REPO }}" >> $GITHUB_STEP_SUMMARY
