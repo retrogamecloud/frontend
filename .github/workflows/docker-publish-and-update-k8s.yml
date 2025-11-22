@@ -137,7 +137,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.K8S_REPO }}
-          token: ${{ secrets.K8S_UPDATE_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
           ref: main
 
       - name: Obtener información de la imagen desde el job anterior
@@ -204,7 +204,7 @@ jobs:
             echo "✅ PR creado en el repositorio de Kubernetes"
           fi
         env:
-          GH_TOKEN: ${{ secrets.K8S_UPDATE_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Resumen
         run: |
@@ -226,7 +226,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.INFRASTRUCTURE_REPO }}
-          token: ${{ secrets.K8S_UPDATE_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
           ref: main
 
       - name: Obtener información de la imagen
@@ -286,7 +286,7 @@ jobs:
             echo "✅ PR creado en el repositorio de Infrastructure"
           fi
         env:
-          GH_TOKEN: ${{ secrets.K8S_UPDATE_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Resumen Infrastructure
         run: |
