@@ -21,7 +21,7 @@ env:
   K8S_REPO: retrogamecloud/kubernetes
   K8S_MANIFEST_FILE: 04-frontend.yaml
   INFRASTRUCTURE_REPO: retrogamecloud/infrastructure
-  INFRASTRUCTURE_MANIFEST_FILE: k8s/frontend/deployment.yaml
+  INFRASTRUCTURE_MANIFEST_FILE: argocd/k8s/frontend/deployment.yaml
 
 jobs:
   test:
