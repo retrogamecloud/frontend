@@ -20,8 +20,8 @@ env:
   IMAGE_NAME: retrogamecloud/frontend
   K8S_REPO: retrogamecloud/kubernetes
   K8S_MANIFEST_FILE: 04-frontend.yaml
-  INFRASTRUCTURE_REPO: retrogamecloud/infrastructure
-  INFRASTRUCTURE_MANIFEST_FILE: argocd/k8s/frontend/deployment.yaml
+  ARGOCD_REPO: retrogamecloud/kubernetes
+  ARGOCD_MANIFEST_FILE: argocd/frontend/deployment.yaml
 
 jobs:
   test:
@@ -215,14 +215,14 @@ jobs:
           echo "- **Manifiesto actualizado**: ${{ env.K8S_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Repositorio**: ${{ env.K8S_REPO }}" >> $GITHUB_STEP_SUMMARY
 
-  update-infrastructure-manifest:
+  update-argocd-manifest:
     needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Clonar repositorio de Infrastructure
+      - name: Clonar repositorio de Kubernetes (ArgoCD manifests)
         uses: actions/checkout@v4
         with:
           repository: ${{ env.INFRASTRUCTURE_REPO }}
@@ -240,13 +240,13 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "image_tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
-      - name: Actualizar deployment de Infrastructure
+      - name: Actualizar deployment de ArgoCD
         run: |
           IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
           VERSION="${{ steps.image_info.outputs.version }}"
           
-          # Actualizar la imagen en el deployment
-          sed -i "s|image: retrogamehub/frontend:.*|image: retrogamehub/frontend:${IMAGE_TAG}|g" ${{ env.INFRASTRUCTURE_MANIFEST_FILE }}
+          # Actualizar la imagen en el deployment de ArgoCD
+          sed -i "s|image: retrogamehub/frontend:.*|image: retrogamehub/frontend:${IMAGE_TAG}|g" ${{ env.ARGOCD_MANIFEST_FILE }}
           
           echo "✅ Deployment actualizado con imagen: ${IMAGE_TAG}"
 
@@ -255,20 +255,21 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      - name: Crear rama y PR con cambios en Infrastructure
+      - name: Crear rama y PR con cambios en ArgoCD
         run: |
           VERSION="${{ steps.image_info.outputs.version }}"
           IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
-          BRANCH_NAME="auto/frontend-${IMAGE_TAG}"
+          BRANCH_NAME="auto/argocd-frontend-${IMAGE_TAG}"
           
-          git add ${{ env.INFRASTRUCTURE_MANIFEST_FILE }}
+          git add ${{ env.ARGOCD_MANIFEST_FILE }}
           
           if git diff --staged --quiet; then
             echo "No hay cambios en el deployment"
           else
             git checkout -b "${BRANCH_NAME}"
             
-            git commit -m "chore: Actualizar imagen de frontend a ${IMAGE_TAG}" \
+            git commit -m "chore(argocd): Actualizar imagen de frontend a ${IMAGE_TAG}" \
+                       -m "Archivo: ${{ env.ARGOCD_MANIFEST_FILE }}" \
                        -m "Version: ${VERSION}" \
                        -m "SHA: ${{ steps.image_info.outputs.short_sha }}" \
                        -m "Commit origen: ${{ github.sha }}" \
@@ -277,22 +278,22 @@ jobs:
             git push origin "${BRANCH_NAME}"
             
             gh pr create \
-              --repo ${{ env.INFRASTRUCTURE_REPO }} \
+              --repo ${{ env.ARGOCD_REPO }} \
               --base main \
               --head "${BRANCH_NAME}" \
-              --title "chore(frontend): Actualizar a ${IMAGE_TAG}" \
-              --body "Actualizacion automatica de frontend - Version: ${VERSION}, Tag: ${IMAGE_TAG}, SHA: ${{ steps.image_info.outputs.short_sha }}, Commit: ${{ github.sha }}"
+              --title "chore(argocd/frontend): Actualizar a ${IMAGE_TAG}" \
+              --body "**Archivo actualizado:** \`${{ env.ARGOCD_MANIFEST_FILE }}\`%0A%0AActualizacion automatica de frontend:%0A- Version: ${VERSION}%0A- Tag: ${IMAGE_TAG}%0A- SHA: ${{ steps.image_info.outputs.short_sha }}%0A- Commit: ${{ github.sha }}"
             
-            echo "✅ PR creado en el repositorio de Infrastructure"
+            echo "✅ PR creado en el repositorio de Kubernetes (ArgoCD)"
           fi
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
-      - name: Resumen Infrastructure
+      - name: Resumen ArgoCD
         run: |
-          echo "## Actualizacion de Infrastructure Completada" >> $GITHUB_STEP_SUMMARY
+          echo "## Actualizacion de ArgoCD Completada" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: ${{ steps.image_info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag de imagen**: ${{ steps.image_info.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Manifiesto actualizado**: ${{ env.INFRASTRUCTURE_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Repositorio**: ${{ env.INFRASTRUCTURE_REPO }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Manifiesto actualizado**: ${{ env.ARGOCD_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repositorio**: ${{ env.ARGOCD_REPO }}" >> $GITHUB_STEP_SUMMARY
