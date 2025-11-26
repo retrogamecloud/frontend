@@ -222,7 +222,7 @@ jobs:
           args: >
             -Dsonar.projectKey=retrogamecloud_${{ github.event.repository.name }}
             -Dsonar.organization=retrogamecloud
-            -Dsonar.sources=src,server.js,server.refactored.js
+            -Dsonar.sources=src,server.js
             -Dsonar.tests=tests
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
 
