@@ -5,9 +5,9 @@
   ],
   "collectCoverageFrom": [
     "server.js",
-    "score-tracker.js",
     "src/**/*.js",
-    "!node_modules/**"
+    "!node_modules/**",
+    "!score-tracker.js"
   ],
   "coveragePathIgnorePatterns": [
     "/node_modules/"
