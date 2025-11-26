@@ -34,7 +34,8 @@ env:
   K8S_MANIFEST_FILE: 04-frontend.yaml
   ARGOCD_REPO: retrogamecloud/kubernetes
   ARGOCD_MANIFEST_FILE: argocd/base/frontend-deployment.yaml
-  ENABLE_SNYK: false # Evitar que se consuma "Private manifest"
+  #ENABLE_SNYK: false # Evitar que se consuma "Private manifest"
+  ENABLE_SNYK: true
   ENABLE_SLACK_NOTIFICATIONS: true
 
 permissions:
