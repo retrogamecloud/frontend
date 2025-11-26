@@ -4,7 +4,8 @@
     "**/tests/**/*.test.js"
   ],
   "collectCoverageFrom": [
-    "server.refactored.js",
+    "server.js",
+    "score-tracker.js",
     "src/**/*.js",
     "!node_modules/**"
   ],
