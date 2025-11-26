@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { createApp, startServer } from '../../server.refactored.js';
+import { createApp, startServer } from '../../server.js';
 import path from 'path';
 
 describe('Server Factory Functions', () => {
