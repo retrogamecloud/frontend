@@ -7,32 +7,53 @@ on:
     paths-ignore:
       - '**.md'
       - '.gitignore'
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches:
       - main
     paths-ignore:
       - '**.md'
       - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag personalizado (ej: v1.0.75). Si se deja vacío, usa SHA del commit'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY_GHCR: ghcr.io
   REGISTRY_DOCKERHUB: docker.io
-  IMAGE_NAME: retrogamecloud/frontend
+  DOCKERHUB_ORG: retrogamehub
   K8S_REPO: retrogamecloud/kubernetes
   K8S_MANIFEST_FILE: 04-frontend.yaml
   ARGOCD_REPO: retrogamecloud/kubernetes
-  ARGOCD_MANIFEST_FILE: argocd/frontend/deployment.yaml
+  ARGOCD_MANIFEST_FILE: argocd/base/frontend-deployment.yaml
+  ENABLE_SNYK: false # Evitar que se consuma "Private manifest"
+  ENABLE_SLACK_NOTIFICATIONS: true
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+## JOB PARA LINTING DE CÓDIGO ##
+  eslint-prettier:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    continue-on-error: true
     
     steps:
       - name: Clonar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configurar Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -40,30 +61,214 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Ejecutar tests
-        run: npm test
+      - name: Ejecutar ESLint
+        id: eslint
+        continue-on-error: true
+        run: |
+          # Verificar si el script existe
+          if npm run | grep -q "lint"; then
+            if npm run lint; then
+              echo "eslint_failed=false" >> $GITHUB_OUTPUT
+            else
+              echo "eslint_failed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⏭️ Script lint no configurado, saltando verificación de ESLint"
+            echo "eslint_failed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Ejecutar Prettier check
+        id: prettier
+        continue-on-error: true
+        run: |
+          # Verificar si el script existe
+          if npm run | grep -q "format:check"; then
+            if npm run format:check; then
+              echo "prettier_failed=false" >> $GITHUB_OUTPUT
+            else
+              echo "prettier_failed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⏭️ Script format:check no configurado, saltando verificación de Prettier"
+            echo "prettier_failed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generar resumen de linting
+        if: always()
+        run: |
+          echo "## 🔍 Resultados de Linting" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.eslint.outputs.eslint_failed }}" = "true" ]; then
+            echo "- ⚠️ **ESLint**: Se encontraron problemas de código" >> $GITHUB_STEP_SUMMARY
+            echo "::warning file=eslint,title=Problemas de ESLint::Se encontraron errores de linting. Ejecuta 'npm run lint' para ver los detalles."
+          else
+            echo "- ✅ **ESLint**: Sin errores" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.prettier.outputs.prettier_failed }}" = "true" ]; then
+            echo "- ⚠️ **Prettier**: Se encontraron problemas de formato" >> $GITHUB_STEP_SUMMARY
+            echo "::warning file=prettier,title=Problemas de Formato::Se encontraron problemas de formato. Ejecuta 'npm run format' para corregirlos automáticamente."
+          else
+            echo "- ✅ **Prettier**: Formato correcto" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.eslint.outputs.eslint_failed }}" = "true" ] || [ "${{ steps.prettier.outputs.prettier_failed }}" = "true" ]; then
+            echo "ℹ️ **Nota**: Se encontraron problemas de linting, pero el workflow continuará. Considera corregirlos para mantener la calidad del código." >> $GITHUB_STEP_SUMMARY
+            echo "::notice title=Linting Informativo::El workflow continúa a pesar de los problemas de linting. Revisa las advertencias para mejorar la calidad del código."
+          fi
+
+## JOB PARA DETECTAR TIPO DE CAMBIOS ##
+  check-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should-test: ${{ steps.changes.outputs.should-test }}
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      
+      - name: Detectar si requiere tests
+        id: changes
+        run: |
+          # Verificar si el mensaje del commit contiene [no-test] o [skip-tests]
+          COMMIT_MSG="$(git log -1 --pretty=%B)"
+          echo "📝 Mensaje del commit: $COMMIT_MSG"
+          
+          if echo "$COMMIT_MSG" | grep -qiE '\[no-test\]|\[skip-tests\]'; then
+            echo "should-test=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Mensaje del commit indica saltar tests: [no-test] o [skip-tests]"
+            echo "🔍 DEBUG: should-test establecido a: false"
+            cat $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Continuar con detección de archivos modificados
+          # Continuar con detección de archivos modificados
+          
+          # En pull requests, comparar con la rama base
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || echo "")
+          else
+            # En push, comparar con el commit anterior
+            FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
+          fi
+          
+          echo "📁 Archivos modificados:"
+          echo "$FILES"
+          echo ""
+          
+          # Si no hay archivos, saltar tests
+          if [ -z "$FILES" ]; then
+            echo "should-test=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Sin cambios detectados, saltando tests"
+          else
+            # Verificar si TODOS los archivos son documentación (ahora workflows NO se excluyen)
+            NON_DOC_FILES=$(echo "$FILES" | grep -vE '\.(md|txt)$|^docs/|^\.gitignore$|^LICENSE$|^\.prettierrc$|^\.prettierignore$|^\.dockerignore$|^\.env\.example$' || true)
+            
+            if [ -z "$NON_DOC_FILES" ]; then
+              echo "should-test=false" >> $GITHUB_OUTPUT
+              echo "⏭️ Solo cambios en documentación/configuración, saltando tests"
+            else
+              echo "should-test=true" >> $GITHUB_OUTPUT
+              echo "✅ Cambios en código detectados, ejecutando tests"
+              echo "Archivos de código modificados:"
+              echo "$NON_DOC_FILES"
+            fi
+          fi
+
+## JOB PARA EJECUTAR TESTS Y ANALISIS DE CALIDAD ##
+  tests:
+    needs: check-changes
+    if: ${{ needs.check-changes.outputs.should-test == 'true' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v6
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar tests unitarios
+        run: npm run test:unit
+
+      - name: Ejecutar tests de integración
+        run: npm run test:integration
 
       - name: Generar reporte de cobertura
         run: npm run test:coverage
 
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v6.0.0
+        continue-on-error: true
+        id: sonar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=retrogamecloud_${{ github.event.repository.name }}
+            -Dsonar.organization=retrogamecloud
+            -Dsonar.sources=src,server.js,server.refactored.js
+            -Dsonar.tests=tests
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+      - name: Verificar resultado de SonarCloud
+        if: always()
+        run: |
+          # Verificar si SONAR_TOKEN está configurado
+          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "::warning title=SonarCloud Deshabilitado::SONAR_TOKEN no configurado. El análisis de SonarCloud se omitió."
+            echo "ℹ️ Para habilitar SonarCloud, configura el secreto SONAR_TOKEN en el repositorio." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.sonar.outcome }}" = "failure" ]; then
+            echo "::error title=SonarCloud Falló::El análisis de SonarCloud encontró problemas."
+            echo "❌ El análisis de SonarCloud falló. Revisa los logs para más detalles." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ steps.sonar.outcome }}" = "success" ]; then
+            echo "✅ Análisis de SonarCloud completado exitosamente." >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Subir reporte de cobertura
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         if: always()
         with:
           files: ./coverage/lcov.info
           flags: unittests
-          name: frontend-coverage
+          name: ${{ github.event.repository.name }}-coverage
 
-  build-and-push:
-    needs: test
+## JOB PARA COMPILAR LA IMAGEN DOCKER (SIN PUBLICAR) ##
+  build:
+    needs: [check-changes, tests]
+    if: |
+      always() &&
+      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      security-events: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image_tag: ${{ steps.version.outputs.image_tag }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      has-vulnerabilities: ${{ steps.final-vulnerabilities.outputs.has-vulnerabilities }}
 
     steps:
       - name: Clonar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -77,6 +282,338 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generar etiqueta de versión y SHA
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          
+          # Determinar el tag a usar
+          if [ -n "${{ inputs.tag }}" ]; then
+            # Tag personalizado desde workflow_dispatch
+            VERSION="${{ inputs.tag }}"
+            IMAGE_TAG="${{ inputs.tag }}"
+            echo "Usando tag personalizado: ${VERSION}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Tag desde push de tag/release
+            VERSION="${{ github.ref_name }}"
+            IMAGE_TAG="${{ github.ref_name }}"
+            echo "Usando tag de release: ${VERSION}"
+          else
+            # Por defecto, usar SHA del commit
+            VERSION="sha-${SHORT_SHA}"
+            IMAGE_TAG="sha-${SHORT_SHA}"
+            echo "Usando SHA del commit: ${VERSION}"
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Versión generada: ${VERSION}"
+          echo "Tag de imagen: ${IMAGE_TAG}"
+
+      - name: Extraer metadatos
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.image_tag }}
+
+      - name: Compilar imagen Docker (cargada localmente)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY_GHCR }}/${{ github.repository }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY_GHCR }}/${{ github.repository }}:buildcache,mode=max
+
+      - name: Verificar imagen local
+        run: |
+          echo "🔍 Verificando imagen local..."
+          docker images | grep "${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}" || true
+          docker inspect "${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:${{ steps.version.outputs.image_tag }}" > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            echo "✅ Imagen encontrada localmente"
+          else
+            echo "❌ Imagen NO encontrada localmente"
+            exit 1
+          fi
+
+      - name: Ejecutar Snyk para escanear vulnerabilidades en imagen local
+        id: snyk-scan
+        uses: snyk/actions/docker@master
+        if: github.event.repository.private == false && env.ENABLE_SNYK == 'true'
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: '${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:${{ steps.version.outputs.image_tag }}'
+          args: --severity-threshold=high --sarif-file-output=snyk-results.sarif --json-file-output=snyk-results.json --platform=linux/amd64
+
+      - name: Mostrar resultados de Snyk (si existen)
+        if: github.event.repository.private == false && env.ENABLE_SNYK == 'true'
+        run: |
+          if [ -f "snyk-results.json" ]; then
+            echo "## 🔍 Resultados del escaneo Snyk" >> $GITHUB_STEP_SUMMARY
+            echo "```json" >> $GITHUB_STEP_SUMMARY
+            head -100 snyk-results.json >> $GITHUB_STEP_SUMMARY || true
+            echo "```" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No se generó archivo JSON de resultados" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Verificar si se generó el archivo SARIF
+        id: check-sarif
+        if: github.event.repository.private == false && env.ENABLE_SNYK == 'true'
+        run: |
+          if [ -f "snyk-results.sarif" ]; then
+            echo "sarif-exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Archivo SARIF generado"
+          else
+            echo "sarif-exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No se generó archivo SARIF"
+          fi
+
+      - name: Subir resultados de Snyk a GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: github.event.repository.private == false && env.ENABLE_SNYK == 'true' && steps.check-sarif.outputs.sarif-exists == 'true'
+        with:
+          sarif_file: 'snyk-results.sarif'
+
+      - name: Verificar vulnerabilidades críticas
+        id: check-vulnerabilities
+        if: github.event.repository.private == false && env.ENABLE_SNYK == 'true'
+        run: |
+          if [ -z "${{ secrets.SNYK_TOKEN }}" ]; then
+            echo "has-vulnerabilities=false" >> $GITHUB_OUTPUT
+            echo "⚠️ SNYK_TOKEN no configurado, saltando verificación" >> $GITHUB_STEP_SUMMARY
+          elif [ ! -f "snyk-results.json" ]; then
+            echo "has-vulnerabilities=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No se generó archivo de resultados JSON, saltando verificación" >> $GITHUB_STEP_SUMMARY
+          else
+            # Contar vulnerabilidades de severidad high o critical en el JSON
+            VULN_COUNT=$(cat snyk-results.json | jq -r '[.vulnerabilities[]? | select(.severity == "high" or .severity == "critical")] | length' 2>/dev/null || echo "0")
+            
+            echo "🔍 Vulnerabilidades críticas/altas encontradas: ${VULN_COUNT}"
+            
+            if [ "${VULN_COUNT}" -gt 0 ]; then
+              echo "::error title=Vulnerabilidades Críticas::Se encontraron ${VULN_COUNT} vulnerabilidades de seguridad críticas/altas en la imagen."
+              echo "❌ **VULNERABILIDADES CRÍTICAS DETECTADAS: ${VULN_COUNT}**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Revisa el tab 'Security' para más detalles." >> $GITHUB_STEP_SUMMARY
+              echo "has-vulnerabilities=true" >> $GITHUB_OUTPUT
+              exit 1
+            else
+              echo "✅ No se encontraron vulnerabilidades críticas" >> $GITHUB_STEP_SUMMARY
+              echo "has-vulnerabilities=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Omitir Snyk porque el repositorio es privado o Snyk está deshabilitado
+        id: skip-snyk
+        if: github.event.repository.private == true || env.ENABLE_SNYK == 'false'
+        run: |
+          # Establecer has-vulnerabilities=false cuando Snyk está deshabilitado
+          echo "has-vulnerabilities=false" >> $GITHUB_OUTPUT
+          
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "ℹ️ Snyk omitido: el repositorio no es público." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Snyk omitido: deshabilitado mediante ENABLE_SNYK=false." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Consolidar resultado de vulnerabilidades
+        id: final-vulnerabilities
+        if: always()
+        run: |
+          # Determinar si hay vulnerabilidades basándose en qué step se ejecutó
+          HAS_VULN="false"
+          
+          if [ "${{ steps.check-vulnerabilities.outcome }}" = "success" ]; then
+            # Snyk se ejecutó, usar su resultado
+            HAS_VULN="${{ steps.check-vulnerabilities.outputs.has-vulnerabilities }}"
+          elif [ "${{ steps.check-vulnerabilities.outcome }}" = "failure" ]; then
+            # Snyk falló por vulnerabilidades críticas
+            HAS_VULN="true"
+          fi
+          # Si Snyk fue omitido (skip-snyk se ejecutó), HAS_VULN queda en "false"
+          
+          echo "has-vulnerabilities=${HAS_VULN}" >> $GITHUB_OUTPUT
+          echo "🔍 Resultado final de vulnerabilidades: ${HAS_VULN}"
+
+      - name: Resumen de imagen compilada
+        run: |
+          echo "## 🐳 Build y Security Scan Completados" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.version.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA**: ${{ steps.version.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Imagen**: ${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:${{ steps.version.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+
+## JOB PARA GENERAR CHANGELOG AUTOMÁTICO ##
+  generate-changelog:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generar changelog
+        id: changelog
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+          VERSION="${{ needs.build.outputs.version }}"
+          
+          # Obtener el tag anterior (si existe)
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "📝 Primera versión, generando changelog completo..."
+            COMMIT_RANGE="HEAD"
+          else
+            echo "📝 Generando changelog desde ${PREVIOUS_TAG}..."
+            COMMIT_RANGE="${PREVIOUS_TAG}..HEAD"
+          fi
+          
+          # Crear o actualizar CHANGELOG.md
+          CHANGELOG_FILE="CHANGELOG.md"
+          TEMP_FILE="CHANGELOG.tmp"
+          
+          # Generar nueva entrada
+          echo "# Changelog" > "$TEMP_FILE"
+          echo "" >> "$TEMP_FILE"
+          echo "Todas las versiones notables de este proyecto se documentan aquí." >> "$TEMP_FILE"
+          echo "" >> "$TEMP_FILE"
+          echo "## [${VERSION}] - $(date +'%Y-%m-%d')" >> "$TEMP_FILE"
+          echo "" >> "$TEMP_FILE"
+          
+          # Categorizar commits por tipo (Conventional Commits)
+          FEATURES=$(git log ${COMMIT_RANGE} --pretty=format:"- %s (%h)" --no-merges | grep -i "^- feat" || echo "")
+          FIXES=$(git log ${COMMIT_RANGE} --pretty=format:"- %s (%h)" --no-merges | grep -i "^- fix" || echo "")
+          CHORES=$(git log ${COMMIT_RANGE} --pretty=format:"- %s (%h)" --no-merges | grep -i "^- chore" || echo "")
+          DOCS=$(git log ${COMMIT_RANGE} --pretty=format:"- %s (%h)" --no-merges | grep -i "^- docs" || echo "")
+          OTHER=$(git log ${COMMIT_RANGE} --pretty=format:"- %s (%h)" --no-merges | grep -viE "^- (feat|fix|chore|docs)" || echo "")
+          
+          # Añadir secciones al changelog
+          if [ -n "$FEATURES" ]; then
+            echo "### ✨ Nuevas Funcionalidades" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+            echo "$FEATURES" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+          fi
+          
+          if [ -n "$FIXES" ]; then
+            echo "### 🐛 Correcciones de Bugs" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+            echo "$FIXES" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+          fi
+          
+          if [ -n "$CHORES" ]; then
+            echo "### 🔧 Mantenimiento" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+            echo "$CHORES" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+          fi
+          
+          if [ -n "$DOCS" ]; then
+            echo "### 📚 Documentación" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+            echo "$DOCS" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+          fi
+          
+          if [ -n "$OTHER" ]; then
+            echo "### 🔄 Otros Cambios" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+            echo "$OTHER" >> "$TEMP_FILE"
+            echo "" >> "$TEMP_FILE"
+          fi
+          
+          # Si existe changelog anterior, añadirlo
+          if [ -f "$CHANGELOG_FILE" ]; then
+            # Saltar el header del changelog viejo y añadir el contenido
+            tail -n +4 "$CHANGELOG_FILE" >> "$TEMP_FILE" 2>/dev/null || true
+          fi
+          
+          # Reemplazar changelog
+          mv "$TEMP_FILE" "$CHANGELOG_FILE"
+          
+          echo "✅ Changelog generado para versión ${VERSION}"
+          
+          # Mostrar resumen
+          echo "## 📝 Changelog Generado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`markdown" >> $GITHUB_STEP_SUMMARY
+          head -50 "$CHANGELOG_FILE" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Commit y push del changelog
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
+          # Determinar la rama destino
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TARGET_BRANCH="main"
+            echo "🏷️ Ejecutando desde tag, pusheando a rama: ${TARGET_BRANCH}"
+          else
+            TARGET_BRANCH="${{ github.ref_name }}"
+            echo "🌿 Ejecutando desde rama: ${TARGET_BRANCH}"
+          fi
+          
+          # Asegurarse de estar en la rama correcta
+          git fetch origin "${TARGET_BRANCH}"
+          git checkout "${TARGET_BRANCH}"
+          git pull origin "${TARGET_BRANCH}"
+          
+          if git diff --quiet CHANGELOG.md; then
+            echo "ℹ️ No hay cambios en CHANGELOG.md"
+          else
+            git add CHANGELOG.md
+            git commit -m "docs: Actualizar CHANGELOG para ${VERSION} [skip ci]"
+            git push origin "${TARGET_BRANCH}"
+            echo "✅ CHANGELOG.md actualizado y publicado en ${TARGET_BRANCH}"
+          fi
+
+## JOB PARA PUBLICAR LA IMAGEN A DOCKER HUB ##
+  push:
+    needs: build
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.build.outputs.has-vulnerabilities != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Clonar repositorio
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generar tag nuevamente (para consistency)
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
       - name: Iniciar sesión en Docker Hub
         uses: docker/login-action@v3
         with:
@@ -84,216 +621,431 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Generar etiqueta de versión y SHA
-        id: version
-        run: |
-          # Contar commits desde el inicio
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          VERSION="v1.0.${COMMIT_COUNT}"
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "Versión generada: ${VERSION}"
-          echo "SHA corto: ${SHORT_SHA}"
-
-      - name: Extraer metadatos
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          images: |
-            retrogamehub/frontend
-            retrogamehub/frontend
-          tags: |
-            type=raw,value=latest
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=sha,prefix=sha-,format=short
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compilar y publicar imagen Docker
-        uses: docker/build-push-action@v5
+      - name: Compilar y publicar imagen en Docker Hub y GHCR
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
-          platforms: linux/amd64
+          tags: |
+            ${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:${{ needs.build.outputs.image_tag }}
+            ${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:latest
+            ghcr.io/${{ github.repository }}:${{ needs.build.outputs.image_tag }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY_GHCR }}/${{ github.repository }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY_GHCR }}/${{ github.repository }}:buildcache,mode=max
 
       - name: Resumen de imagen publicada
         run: |
-          echo "✅ Imagen publicada exitosamente"
-          echo "📦 Versión: ${{ steps.version.outputs.version }}"
-          echo "🔖 SHA: sha-${{ steps.version.outputs.short_sha }}"
+          echo "## 📦 Imagen Publicada" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión**: ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ needs.build.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA**: ${{ needs.build.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Registries:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐙 GHCR: \`ghcr.io/${{ github.repository }}:${{ needs.build.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐳 Docker Hub: \`${{ env.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:${{ needs.build.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+## JOB PARA ACTUALIZAR EL MANIFIESTO DE KUBERNETES Y CREAR UNA PR ##
+  create-update-branch:
+    needs: [build, push]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      branch_name: ${{ steps.branch.outputs.branch_name }}
+      service: ${{ steps.branch.outputs.service }}
+      image_tag: ${{ steps.branch.outputs.image_tag }}
+      version: ${{ steps.branch.outputs.version }}
+    steps:
+      - name: Preparar nombre de rama
+        id: branch
+        run: |
+          SERVICE="${{ github.event.repository.name }}"
+          IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+          BRANCH_NAME="auto/${SERVICE}-${IMAGE_TAG}"
+          VERSION="${{ needs.build.outputs.version }}"
+
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "service=${SERVICE}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Clonar repositorio de Kubernetes
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.K8S_REPO }}
+          token: ${{ secrets.K8S_UPDATE_TOKEN }}
+          ref: main
+
+      - name: Crear rama en repositorio Kubernetes
+        run: |
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+          # Verificar si la rama ya existe en remoto
+          if git ls-remote --exit-code origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+            echo "ℹ️ La rama '${BRANCH_NAME}' ya existe en remoto."
+          else
+            # Crear la rama desde main
+            git checkout -b "${BRANCH_NAME}"
+            git push -u origin "${BRANCH_NAME}"
+            echo "✅ Rama '${BRANCH_NAME}' creada en remoto."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.K8S_UPDATE_TOKEN }}
 
   update-kubernetes-manifest:
-    needs: build-and-push
+    needs: [create-update-branch]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.create-update-branch.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - name: Clonar repositorio de Kubernetes
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.K8S_REPO }}
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.K8S_UPDATE_TOKEN }}
           ref: main
 
-      - name: Obtener información de la imagen desde el job anterior
-        id: image_info
+      - name: Preparar rama de trabajo
         run: |
-          # Reutilizar el SHA del commit actual sin clonar de nuevo
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          COMMIT_COUNT=${{ github.run_number }}
-          VERSION="v1.0.${COMMIT_COUNT}"
-          
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "image_tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Actualizar manifiesto de Kubernetes
-        run: |
-          IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
-          VERSION="${{ steps.image_info.outputs.version }}"
-          
-          # Actualizar la imagen en el manifiesto usando sed
-          sed -i "s|image: retrogamehub/frontend:.*|image: retrogamehub/frontend:${IMAGE_TAG}|g" ${{ env.K8S_MANIFEST_FILE }}
-          
-          # Actualizar el comentario con la versión
-          sed -i "s|# Imagen del frontend desde DockerHub.*|# Imagen del frontend desde DockerHub - ${VERSION} (${IMAGE_TAG})|g" ${{ env.K8S_MANIFEST_FILE }}
-          
-          echo "✅ Manifiesto actualizado con imagen: ${IMAGE_TAG}"
-
-      - name: Configurar Git
-        run: |
+          BRANCH_NAME="${{ needs.create-update-branch.outputs.branch_name }}"
+          git fetch origin "${BRANCH_NAME}" || true
+          git checkout -B "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      - name: Crear rama y PR con cambios
+      - name: Actualizar manifiesto de Kubernetes
         run: |
-          VERSION="${{ steps.image_info.outputs.version }}"
-          IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
-          BRANCH_NAME="auto/frontend-${IMAGE_TAG}"
+          IMAGE_TAG="${{ needs.create-update-branch.outputs.image_tag }}"
+          VERSION="${{ needs.create-update-branch.outputs.version }}"
+          SERVICE="${{ needs.create-update-branch.outputs.service }}"
           
+          # Actualizar la imagen en el manifiesto usando sed
+          sed -i "s|image: ${{ env.DOCKERHUB_ORG }}/${SERVICE}:.*|image: ${{ env.DOCKERHUB_ORG }}/${SERVICE}:${IMAGE_TAG}|g" ${{ env.K8S_MANIFEST_FILE }}
+          
+          # Actualizar el comentario con la versión
+          sed -i "s|# Imagen de ${SERVICE} desde DockerHub.*|# Imagen de ${SERVICE} desde DockerHub - ${VERSION} (${IMAGE_TAG})|g" ${{ env.K8S_MANIFEST_FILE }}
+          
+          echo "✅ Manifiesto actualizado con imagen: ${IMAGE_TAG}"
+
+      - name: Commit y push de cambios (con rebase si es necesario)
+        run: |
+          VERSION="${{ needs.create-update-branch.outputs.version }}"
+          IMAGE_TAG="${{ needs.create-update-branch.outputs.image_tag }}"
+          SERVICE="${{ needs.create-update-branch.outputs.service }}"
+          BRANCH_NAME="${{ needs.create-update-branch.outputs.branch_name }}"
+
           git add ${{ env.K8S_MANIFEST_FILE }}
-          
+
           # Solo proceder si hay cambios
           if git diff --staged --quiet; then
             echo "No hay cambios en el manifiesto"
-          else
-            # Crear rama para el PR
-            git checkout -b "${BRANCH_NAME}"
-            
-            git commit -m "chore: Actualizar imagen de frontend a ${IMAGE_TAG}" \
-                       -m "Version: ${VERSION}" \
-                       -m "SHA: ${{ steps.image_info.outputs.short_sha }}" \
-                       -m "Commit origen: ${{ github.sha }}" \
-                       -m "Actualizacion automatica desde CI/CD del repositorio frontend"
-            
-            git push origin "${BRANCH_NAME}"
-            
-            # Crear PR usando GitHub CLI
-            gh pr create \
-              --repo ${{ env.K8S_REPO }} \
-              --base main \
-              --head "${BRANCH_NAME}" \
-              --title "chore(frontend): Actualizar a ${IMAGE_TAG}" \
-              --body "Actualizacion automatica de frontend - Version: ${VERSION}, Tag: ${IMAGE_TAG}, SHA: ${{ steps.image_info.outputs.short_sha }}, Commit: ${{ github.sha }}"
-            
-            echo "✅ PR creado en el repositorio de Kubernetes"
+            exit 0
           fi
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+          git commit -m "chore: Actualizar imagen de ${SERVICE} a ${IMAGE_TAG} [skip ci]" \
+                     -m "Version: ${VERSION}" \
+                     -m "Commit origen: ${{ github.sha }}" \
+                     -m "Actualizacion automatica desde CI/CD del repositorio ${SERVICE}"
+
+          # Intentar push con reintentos y rebase en caso de rechazo
+          ATTEMPTS=0
+          MAX_ATTEMPTS=3
+          until [ $ATTEMPTS -ge $MAX_ATTEMPTS ]
+          do
+            if git push origin "${BRANCH_NAME}"; then
+              echo "✅ Cambios empujados a la rama '${BRANCH_NAME}' en K8S"
+              break
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "⚠️ Push rechazado. Intentando rebase (intento ${ATTEMPTS}/${MAX_ATTEMPTS})..."
+            git fetch origin "${BRANCH_NAME}" || true
+            # Rebase de nuestros commits encima de la rama remota
+            git pull --rebase origin "${BRANCH_NAME}" || {
+              echo "⚠️ Rebase fallido, intentando abortar..."; git rebase --abort || true; 
+            }
+          done
+
+          if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+            echo "❌ No se pudo empujar los cambios tras ${MAX_ATTEMPTS} intentos."
+            exit 1
+          fi
 
       - name: Resumen
         run: |
-          echo "## Actualizacion de Kubernetes Completada" >> $GITHUB_STEP_SUMMARY
+          echo "## Actualizacion de Kubernetes completada" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ steps.image_info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag de imagen**: ${{ steps.image_info.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Servicio**: ${{ needs.create-update-branch.outputs.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.create-update-branch.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag de imagen**: ${{ needs.create-update-branch.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Manifiesto actualizado**: ${{ env.K8S_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Repositorio**: ${{ env.K8S_REPO }}" >> $GITHUB_STEP_SUMMARY
 
+## JOB PARA ACTUALIZAR EL MANIFIESTO DE ARGOCD Y CREAR UNA PR ##
   update-argocd-manifest:
-    needs: build-and-push
+    needs: [create-update-branch]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.create-update-branch.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - name: Clonar repositorio de Kubernetes (ArgoCD manifests)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.ARGOCD_REPO }}
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.K8S_UPDATE_TOKEN }}
           ref: main
 
-      - name: Obtener información de la imagen
-        id: image_info
+      - name: Preparar rama de trabajo
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          COMMIT_COUNT=${{ github.run_number }}
-          VERSION="v1.0.${COMMIT_COUNT}"
-          
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "image_tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Actualizar deployment de ArgoCD
-        run: |
-          IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
-          VERSION="${{ steps.image_info.outputs.version }}"
-          
-          # Actualizar la imagen en el deployment de ArgoCD
-          sed -i "s|image: retrogamehub/frontend:.*|image: retrogamehub/frontend:${IMAGE_TAG}|g" ${{ env.ARGOCD_MANIFEST_FILE }}
-          
-          echo "✅ Deployment actualizado con imagen: ${IMAGE_TAG}"
-
-      - name: Configurar Git
-        run: |
+          BRANCH_NAME="${{ needs.create-update-branch.outputs.branch_name }}"
+          git fetch origin "${BRANCH_NAME}" || true
+          git checkout -B "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      - name: Crear rama y PR con cambios en ArgoCD
+      - name: Actualizar manifiesto de Kubernetes
         run: |
-          VERSION="${{ steps.image_info.outputs.version }}"
-          IMAGE_TAG="${{ steps.image_info.outputs.image_tag }}"
-          BRANCH_NAME="auto/argocd-frontend-${IMAGE_TAG}"
+          IMAGE_TAG="${{ needs.create-update-branch.outputs.image_tag }}"
+          VERSION="${{ needs.create-update-branch.outputs.version }}"
+          SERVICE="${{ needs.create-update-branch.outputs.service }}"
           
+          # Actualizar la imagen en el deployment de ArgoCD
+          sed -i "s|image: ${{ env.DOCKERHUB_ORG }}/${SERVICE}:.*|image: ${{ env.DOCKERHUB_ORG }}/${SERVICE}:${IMAGE_TAG}|g" ${{ env.ARGOCD_MANIFEST_FILE }}
+          
+          # Actualizar el comentario con la versión
+          sed -i "s|# Imagen de ${SERVICE} desde DockerHub.*|# Imagen de ${SERVICE} desde DockerHub - ${VERSION} (${IMAGE_TAG})|g" ${{ env.ARGOCD_MANIFEST_FILE }}
+          
+          echo "✅ Deployment actualizado con imagen: ${IMAGE_TAG}"
+
+      - name: Commit y push de cambios (con rebase si es necesario)
+        run: |
+          VERSION="${{ needs.create-update-branch.outputs.version }}"
+          IMAGE_TAG="${{ needs.create-update-branch.outputs.image_tag }}"
+          SERVICE="${{ needs.create-update-branch.outputs.service }}"
+          BRANCH_NAME="${{ needs.create-update-branch.outputs.branch_name }}"
+
           git add ${{ env.ARGOCD_MANIFEST_FILE }}
-          
+
+          # Solo proceder si hay cambios
           if git diff --staged --quiet; then
-            echo "No hay cambios en el deployment"
-          else
-            git checkout -b "${BRANCH_NAME}"
-            
-            git commit -m "chore(argocd): Actualizar imagen de frontend a ${IMAGE_TAG}" \
-                       -m "Archivo: ${{ env.ARGOCD_MANIFEST_FILE }}" \
-                       -m "Version: ${VERSION}" \
-                       -m "SHA: ${{ steps.image_info.outputs.short_sha }}" \
-                       -m "Commit origen: ${{ github.sha }}" \
-                       -m "Actualizacion automatica desde CI/CD del repositorio frontend"
-            
-            git push origin "${BRANCH_NAME}"
-            
-            gh pr create \
-              --repo ${{ env.ARGOCD_REPO }} \
-              --base main \
-              --head "${BRANCH_NAME}" \
-              --title "chore(argocd/frontend): Actualizar a ${IMAGE_TAG}" \
-              --body "**Archivo actualizado:** \`${{ env.ARGOCD_MANIFEST_FILE }}\`%0A%0AActualizacion automatica de frontend:%0A- Version: ${VERSION}%0A- Tag: ${IMAGE_TAG}%0A- SHA: ${{ steps.image_info.outputs.short_sha }}%0A- Commit: ${{ github.sha }}"
-            
-            echo "✅ PR creado en el repositorio de Kubernetes (ArgoCD)"
+            echo "No hay cambios en el manifiesto"
+            exit 0
           fi
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+          git commit -m "chore: Actualizar imagen de ${SERVICE} a ${IMAGE_TAG} [skip ci]" \
+                     -m "Version: ${VERSION}" \
+                     -m "Commit origen: ${{ github.sha }}" \
+                     -m "Actualizacion automatica desde CI/CD del repositorio ${SERVICE}"
+
+          # Intentar push con reintentos y rebase en caso de rechazo
+          ATTEMPTS=0
+          MAX_ATTEMPTS=3
+          until [ $ATTEMPTS -ge $MAX_ATTEMPTS ]
+          do
+            if git push origin "${BRANCH_NAME}"; then
+              echo "✅ Cambios empujados a la rama '${BRANCH_NAME}' en ArgoCD"
+              break
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "⚠️ Push rechazado. Intentando rebase (intento ${ATTEMPTS}/${MAX_ATTEMPTS})..."
+            git fetch origin "${BRANCH_NAME}" || true
+            git pull --rebase origin "${BRANCH_NAME}" || { echo "⚠️ Rebase fallido, intentando abortar..."; git rebase --abort || true; }
+          done
+
+          if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+            echo "❌ No se pudo empujar los cambios tras ${MAX_ATTEMPTS} intentos."
+            exit 1
+          fi
 
       - name: Resumen ArgoCD
         run: |
-          echo "## Actualizacion de ArgoCD Completada" >> $GITHUB_STEP_SUMMARY
+          echo "## Actualizacion de ArgoCD completada" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ steps.image_info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag de imagen**: ${{ steps.image_info.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Servicio**: ${{ needs.create-update-branch.outputs.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.create-update-branch.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag de imagen**: ${{ needs.create-update-branch.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Manifiesto actualizado**: ${{ env.ARGOCD_MANIFEST_FILE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Repositorio**: ${{ env.ARGOCD_REPO }}" >> $GITHUB_STEP_SUMMARY
+
+## JOB ÚNICO PARA CREAR LA PR CON AMBOS CAMBIOS ##
+  create-update-pr:
+    needs: [create-update-branch, update-kubernetes-manifest, update-argocd-manifest]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.update-kubernetes-manifest.result == 'success' &&
+      needs.update-argocd-manifest.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Clonar repositorio de Kubernetes
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.K8S_REPO }}
+          token: ${{ secrets.K8S_UPDATE_TOKEN }}
+          ref: main
+      - name: Crear PR única con ambos cambios
+        run: |
+          SERVICE="${{ needs.create-update-branch.outputs.service }}"
+          IMAGE_TAG="${{ needs.create-update-branch.outputs.image_tag }}"
+          VERSION="${{ needs.create-update-branch.outputs.version }}"
+          BRANCH_NAME="${{ needs.create-update-branch.outputs.branch_name }}"
+
+          # Asegurar que la rama remota existe y tiene cambios respecto a main
+          git fetch origin "${BRANCH_NAME}" || true
+          if git ls-remote --exit-code origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+            git fetch origin main
+            # Contar commits: izquierda (rama), derecha (main)
+            COUNTS=$(git rev-list --left-right --count origin/${BRANCH_NAME}...origin/main 2>/dev/null || echo "0	0")
+            LEFT_COMMITS=$(echo "$COUNTS" | awk '{print $1}')
+            RIGHT_COMMITS=$(echo "$COUNTS" | awk '{print $2}')
+            echo "🔢 Commits - rama:${LEFT_COMMITS} main:${RIGHT_COMMITS}"
+            if [ "$LEFT_COMMITS" -eq 0 ]; then
+              echo "ℹ️ La rama '${BRANCH_NAME}' no tiene cambios respecto a 'main'. No se creará PR."
+              exit 0
+            fi
+          else
+            echo "ℹ️ La rama remota '${BRANCH_NAME}' no existe. No se creará PR."
+            exit 0
+          fi
+
+          # Si ya existe PR para la rama, no crear otra
+          PR_URL=""
+          if gh pr view "${BRANCH_NAME}" --repo ${{ env.K8S_REPO }} --json url -q .url >/dev/null 2>&1; then
+            PR_URL=$(gh pr view "${BRANCH_NAME}" --repo ${{ env.K8S_REPO }} --json url -q .url)
+            echo "ℹ️ PR ya existe para '${BRANCH_NAME}'."
+          else
+            gh pr create \
+              --repo ${{ env.K8S_REPO }} \
+              --base main \
+              --head "${BRANCH_NAME}" \
+              --title "chore(${SERVICE}): Actualizar manifiestos a ${IMAGE_TAG}" \
+              --body "Actualizacion automatica de ${SERVICE}: Kubernetes: ${{ env.K8S_MANIFEST_FILE }} || ArgoCD: ${{ env.ARGOCD_MANIFEST_FILE }} || Version: ${VERSION} || Tag: ${IMAGE_TAG} || Commit: ${{ github.sha }}"
+            echo "✅ PR creada con ambos cambios"
+            PR_URL=$(gh pr view "${BRANCH_NAME}" --repo ${{ env.K8S_REPO }} --json url -q .url)
+          fi
+
+          echo "## 📥 Pull Request de actualización" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rama**: ${BRANCH_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Servicio**: ${SERVICE}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión**: ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$PR_URL" ]; then
+            echo "- **PR**: ${PR_URL}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **PR**: No disponible" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.K8S_UPDATE_TOKEN }}
+
+## JOB PARA NOTIFICAR FALLOS EN SLACK ##
+  notify-slack:
+    needs: [eslint-prettier, check-changes, tests, build, generate-changelog, push, create-update-branch, update-kubernetes-manifest, update-argocd-manifest, create-update-pr]
+    if: >-
+      always() &&
+      (
+        needs.tests.result == 'failure' ||
+        needs.build.result == 'failure' ||
+        needs.push.result == 'failure' ||
+        needs.create-update-branch.result == 'failure' ||
+        needs.update-kubernetes-manifest.result == 'failure' ||
+        needs.update-argocd-manifest.result == 'failure' ||
+        needs.create-update-pr.result == 'failure'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notificar fallos en Slack
+        run: |
+          if [ "${{ env.ENABLE_SLACK_NOTIFICATIONS }}" = "true" ]; then
+            echo "📤 Enviando notificación a Slack..."
+            curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+              -H 'Content-Type: application/json' \
+              -d '{
+                "text": "❌ Workflow fallido en ${{ github.repository }}",
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "❌ CI/CD Workflow Fallido"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Repositorio:*\n${{ github.repository }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Rama:*\n${{ github.ref_name }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Workflow:*\n${{ github.workflow }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Evento:*\n${{ github.event_name }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Commit:*\n<${{ github.event.head_commit.url }}|${{ github.sha }}>"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Autor:*\n${{ github.actor }}"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*Jobs fallidos:*\n${{ needs.tests.result == 'failure' && '• Tests\n' || '' }}${{ needs.build.result == 'failure' && '• Build\n' || '' }}${{ needs.push.result == 'failure' && '• Push\n' || '' }}${{ needs.create-update-branch.result == 'failure' && '• Create Update Branch\n' || '' }}${{ needs.update-kubernetes-manifest.result == 'failure' && '• Update Kubernetes Manifest\n' || '' }}${{ needs.update-argocd-manifest.result == 'failure' && '• Update ArgoCD Manifest\n' || '' }}${{ needs.create-update-pr.result == 'failure' && '• Create PR\n' || '' }}"
+                    }
+                  },
+                  {
+                    "type": "actions",
+                    "elements": [
+                      {
+                        "type": "button",
+                        "text": {
+                          "type": "plain_text",
+                          "text": "Ver Workflow"
+                        },
+                        "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      }
+                    ]
+                  }
+                ]
+              }'
+            echo "✅ Notificación enviada a Slack"
+          else
+            echo "ℹ️ No se han enviado alertas a Slack (ENABLE_SLACK_NOTIFICATIONS != 'true')"
+          fi
