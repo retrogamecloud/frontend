@@ -1,6 +1,6 @@
 import { describe, test, expect, jest, beforeAll } from '@jest/globals';
 import request from 'supertest';
-import { createApp } from '../../server.refactored.js';
+import { createApp } from '../../server.js';
 import path from 'path';
 
 describe('Frontend Server - Tests de Integración', () => {

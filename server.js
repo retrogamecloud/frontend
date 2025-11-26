@@ -1,36 +1,53 @@
-import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
+// ============================================================================
+// FRONTEND SERVER - RetroGameCloud
+// ============================================================================
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
+import { noCacheMiddleware } from "./src/middleware/cacheMiddleware.js";
+import { getDirname, getProjectRoot, getGamesPath } from "./src/config/paths.js";
+import { setupRoutes, setupHealthCheck } from "./src/routes/routes.js";
 
-// Middleware para deshabilitar caché en desarrollo
-app.use((req, res, next) => {
-  if (req.url.endsWith('.html')) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
-  next();
-});
+/**
+ * Crea y configura la aplicación Express
+ * @param {string} dirname - Directorio actual
+ * @returns {express.Application} App configurada
+ */
+export function createApp(dirname) {
+  const projectRoot = getProjectRoot(dirname);
+  const gamesPath = getGamesPath(projectRoot);
+  
+  // Crear app con rutas
+  const app = setupRoutes(dirname, gamesPath);
+  
+  // Aplicar middleware de caché
+  app.use(noCacheMiddleware());
+  
+  // Configurar health check
+  setupHealthCheck(app);
+  
+  return app;
+}
 
-// Determinar la raíz del proyecto (un nivel por encima de 'frontend')
-const projectRoot = path.resolve(__dirname, '..');
+/**
+ * Inicia el servidor
+ * @param {express.Application} app - App de Express
+ * @param {number} port - Puerto del servidor
+ * @returns {http.Server} Servidor HTTP
+ */
+export function startServer(app, port) {
+  return app.listen(port, () => {
+    console.log(`🎮 Frontend corriendo en http://localhost:${port}`);
+  });
+}
 
-// 1. Servir todos los archivos estáticos dentro de la carpeta 'frontend' (HTML, CSS, JS de la aplicación)
-app.use(express.static(__dirname));
+// ============================================================================
+// INICIAR SERVIDOR (solo si se ejecuta directamente)
+// ============================================================================
 
-// 2. 🟢 AÑADIDO: Servir la carpeta 'juegos' bajo la ruta URL '/juegos'.
-// Esto permite que la ruta relativa '../juegos/...' funcione correctamente.
-app.use('/juegos', express.static(path.join(projectRoot, 'juegos')));
-
-// Health check endpoint para Kubernetes
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
-});
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🎮 Frontend corriendo en http://localhost:${PORT}`);
-});
+/* istanbul ignore next */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const __dirname = getDirname(import.meta.url);
+  const PORT = process.env.PORT || 8080;
+  
+  const app = createApp(__dirname);
+  startServer(app, PORT);
+}
