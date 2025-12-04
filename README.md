@@ -1,4 +1,4 @@
-# 🎮 RetroGameCloud - Frontend
+# RetroGameCloud - Frontend
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green?logo=node.js)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-5.1-white?logo=express)](https://expressjs.com/)
@@ -6,12 +6,12 @@
 
 Interfaz web de RetroGameCloud. Servidor Express que sirve HTML/CSS/JS con emulador DOS.js integrado. Permite a los usuarios jugar juegos clásicos directamente en el navegador, ver puntuaciones y competir en rankings.
 
-**Documentación General:** 📖 [Ir al README Principal](./../README.md)  
-**Documentación Profesional:** 📚 [Acceder a docs.retrogamehub.games](https://docs.retrogamehub.games)
+**Documentación General:** [Ir al README Principal](https://github.com/retrogamecloud/.github/blob/main/README.md)  
+**Documentación Profesional:** [Acceder a la Wiki](https://www.retrogamehub.games/wiki)
 
 ---
 
-## 📋 Tabla de Contenidos
+## Tabla de Contenidos
 
 - [Descripción del Repositorio](#descripción-del-repositorio)
 - [Funcionalidad Principal](#funcionalidad-principal)
@@ -20,15 +20,17 @@ Interfaz web de RetroGameCloud. Servidor Express que sirve HTML/CSS/JS con emula
 - [Configuración](#configuración)
 - [Despliegue con Docker](#despliegue-con-docker)
 - [NPM Scripts](#npm-scripts)
+- [Pipeline CI/CD](#pipeline-cicd)
 - [Rutas y Páginas](#rutas-y-páginas)
 - [Estructura del Proyecto](#estructura-del-proyecto)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 - [Rollback & Limpieza](#rollback--limpieza)
+- [Seguridad](#seguridad)
 
 ---
 
-## 📖 Descripción del Repositorio
+## Descripción del Repositorio
 
 Este repositorio contiene la **interfaz web frontend** de RetroGameCloud. Es un servidor Express que:
 
@@ -45,7 +47,7 @@ El frontend **NO contiene lógica de negocio**, solo UI. Toda la lógica se dele
 
 ---
 
-## 🎯 Funcionalidad Principal
+## Funcionalidad Principal
 
 ### 1. Páginas Públicas
 
@@ -86,7 +88,7 @@ El frontend **NO contiene lógica de negocio**, solo UI. Toda la lógica se dele
 
 ---
 
-## 📦 Stack Tecnológico
+## Stack Tecnológico
 
 ### Frontend Runtime
 
@@ -120,7 +122,7 @@ El frontend **NO contiene lógica de negocio**, solo UI. Toda la lógica se dele
 
 ---
 
-## 🚀 Instalación Local
+## Instalación Local
 
 ### Requisitos Previos
 
@@ -167,7 +169,7 @@ CDN_BASE_URL=http://localhost:8086
 npm start
 
 # Deberías ver:
-# 🎮 Frontend corriendo en http://localhost:8080
+# Frontend corriendo en http://localhost:8080
 ```
 
 ### Paso 5: Acceder
@@ -178,7 +180,7 @@ http://localhost:8080
 
 ---
 
-## ⚙️ Configuración
+## Configuración
 
 ### Variables de Entorno
 
@@ -200,9 +202,13 @@ CDN_BASE_URL=https://retrogamehub.games/cdn
 
 Ver `.env.example` en el repositorio para template.
 
+### Secrets en AWS
+
+> **IMPORTANTE:** Todos los secrets (credenciales, tokens, contraseñas, claves de API) se almacenan **exclusivamente en AWS Secrets Manager** y **NO están en este repositorio público**. No hay información sensible en el código fuente.
+
 ---
 
-## 🐳 Despliegue con Docker
+## Despliegue con Docker
 
 ### Opción A: Docker Compose (con todo)
 
@@ -246,7 +252,7 @@ curl -I http://localhost:8081
 
 ---
 
-## 📝 NPM Scripts
+## NPM Scripts
 
 | Script | Comando | Descripción |
 |--------|---------|-------------|
@@ -274,7 +280,34 @@ open coverage/index.html
 
 ---
 
-## 🌐 Rutas y Páginas
+## Pipeline CI/CD
+
+Este repositorio implementa un pipeline CI/CD completamente automatizado mediante GitHub Actions que valida, construye y despliega el frontend de forma segura.
+
+### Validaciones Automáticas
+
+Cada vez que haces un push o abres un Pull Request, se ejecutan automáticamente:
+
+✅ **Testing:** Jest con cobertura mínima 70% (`npm test`)  
+✅ **Linting:** ESLint valida la calidad del código (`npm run lint`)  
+✅ **Seguridad de Imágenes:** Trivy escanea vulnerabilidades en Docker  
+✅ **Análisis Estático:** SonarCloud detecta code smells, bugs y security hotspots  
+✅ **Build:** Se construye la imagen Docker y se pushea a GitHub Container Registry (GHCR)  
+✅ **Despliegue:** Actualiza automáticamente los manifiestos Kubernetes en el repositorio de infraestructura  
+
+### Workflows Disponibles
+
+| Workflow | Trigger | Descripción |
+|---|---|---|
+| **cicd.yml** | Push a `main`, PR | Testing, validación y despliegue automático |
+| **rollback-frontend.yml** | Manual (workflow_dispatch) | Revertir a una versión anterior si es necesario |
+| **dependabot.yml** | Scheduled (diario) | Mantener dependencias actualizadas |
+
+**Documentación detallada:** Ver [`.github/README-WF.md`](./.github/README-WF.md) para más información sobre cada workflow, triggers, variables y secrets.
+
+---
+
+## Rutas y Páginas
 
 ### Rutas Públicas
 
@@ -305,7 +338,7 @@ Cada request:
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 frontend/
@@ -355,13 +388,20 @@ frontend/
 │       ├── icons/
 │       └── fonts/
 │
-└── coverage/
+├── coverage/
     └── (generado por Jest)
+│
+└── .github/
+    ├── workflows/
+    │   ├── cicd.yml              # Pipeline CI/CD (Testing, Linting, Build, Deploy)
+    │   └── rollback-frontend.yml # Rollback manual
+    ├── dependabot.yml            # Actualizaciones automáticas de dependencias
+    └── README-WF.md              # Documentación detallada de workflows
 ```
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Requisitos
 
@@ -412,7 +452,7 @@ describe('Login Flow', () => {
 
 ---
 
-## ⚠️ Troubleshooting
+## Troubleshooting
 
 ### Error: Cannot find module 'express'
 
@@ -468,7 +508,7 @@ localStorage.removeItem('accessToken');
 
 ---
 
-## 🔄 Rollback & Limpieza
+## Rollback & Limpieza
 
 ### Rollback de Cambios
 
@@ -517,7 +557,7 @@ npm start
 
 ---
 
-## 🔐 Seguridad
+## Seguridad
 
 ### Token Management
 
@@ -559,7 +599,7 @@ function validateEmail(email) {
 
 ---
 
-## 📱 Responsive Design
+## Responsive Design
 
 - Mobile first approach
 - Breakpoints: 768px (tablet), 1024px (desktop)
@@ -568,7 +608,7 @@ function validateEmail(email) {
 
 ---
 
-## 🎨 Tema y Estilos
+## Tema y Estilos
 
 **Tema retro:**
 - Colores: Verde neón (#00ff88), fondo oscuro
@@ -587,7 +627,7 @@ Personalización:
 
 ---
 
-## 📡 Integración con Backend
+## Integración con Backend
 
 ### Endpoints Usados
 
@@ -617,12 +657,22 @@ GET /api/rankings/games/:gameId
 
 ---
 
-## 📚 Enlaces Útiles
+## Enlaces Útiles
 
+### Documentación del Proyecto
 - **Documentación General:** [/README.md](/../README.md)
-- **Documentación Profesional:** [docs.retrogamehub.games](https://docs.retrogamehub.games)
-- **Backend API:** [backend/README.md](/../backend/README.md)
+- **Documentación Profesional:** [Wiki](https://www.retrogamehub.games/wiki)
+- **Workflows CI/CD:** [.github/README-WF.md](./.github/README-WF.md)
 - **Testing:** [tests/README.md](./tests/README.md)
+
+### Repositorios Relacionados
+- [Backend API](https://github.com/retrogamecloud/backend/blob/main/README.md)
+- [Kong Gateway](https://github.com/retrogamecloud/kong/blob/main/README.md)
+- [Kubernetes](https://github.com/retrogamecloud/kubernetes/blob/main/README.md)
+- [Infrastructure](https://github.com/retrogamecloud/infrastructure)
+- [Documentación Centralizada](https://github.com/retrogamecloud/docs)
+
+### Documentación Externa
 - **Express.js:** https://expressjs.com/
 - **DOS.js:** http://js-dos.com/
 - **MDN Web Docs:** https://developer.mozilla.org/
