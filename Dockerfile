@@ -31,5 +31,5 @@ USER nodejs
 # Puerto
 EXPOSE 8080
 
-# Usar código refactorizado que tiene 100% de cobertura
-CMD ["node", "server.wrapper.js"]
+# Comando para iniciar el servidor
+CMD ["node", "server.js"]
