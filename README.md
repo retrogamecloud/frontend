@@ -1,5 +1,6 @@
 # RetroGameCloud - Frontend
 
+[![CI/CD Pipeline](https://github.com/retrogamecloud/frontend/actions/workflows/cicd.yml/badge.svg)](https://github.com/retrogamecloud/frontend/actions/workflows/cicd.yml/badge.svg)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green?logo=node.js)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/Express.js-5.1-white?logo=express)](https://expressjs.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
