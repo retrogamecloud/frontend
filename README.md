@@ -676,9 +676,3 @@ GET /api/rankings/games/:gameId
 - **Express.js:** https://expressjs.com/
 - **DOS.js:** http://js-dos.com/
 - **MDN Web Docs:** https://developer.mozilla.org/
-
----
-
-**Última actualización:** 1 de diciembre de 2025  
-**Versión:** 1.0.0  
-**Mantenedor:** RetroGameCloud Team
