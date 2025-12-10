@@ -660,12 +660,6 @@ GET /api/rankings/games/:gameId
 
 ## Enlaces Útiles
 
-### Documentación del Proyecto
-- **README general:** [/README.md](/../README.md)
-- **Documentación:** [Wiki](https://retrogamecloud.mintlify.app/)
-- **Workflows CI/CD:** [.github/README-WF.md](./.github/README-WF.md)
-- **Testing:** [tests/README.md](./tests/README.md)
-
 ### Repositorios Relacionados
 - [Backend API](https://github.com/retrogamecloud/backend/blob/main/README.md)
 - [Kong Gateway](https://github.com/retrogamecloud/kong/blob/main/README.md)
