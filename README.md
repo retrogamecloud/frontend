@@ -7,8 +7,8 @@
 
 Interfaz web de RetroGameCloud. Servidor Express que sirve HTML/CSS/JS con emulador DOS.js integrado. Permite a los usuarios jugar juegos clásicos directamente en el navegador, ver puntuaciones y competir en rankings.
 
-**Documentación General:** [Ir al README Principal](https://github.com/retrogamecloud/.github/blob/main/README.md)  
-**Documentación Profesional:** [Acceder a la Wiki](https://www.retrogamehub.games/wiki)
+**README general:** [Ir al README Principal](https://github.com/retrogamecloud/.github/blob/main/profile/README.md)  
+**Documentación:** [Acceder a la Wiki](https://retrogamecloud.mintlify.app/)
 
 ---
 
@@ -661,8 +661,8 @@ GET /api/rankings/games/:gameId
 ## Enlaces Útiles
 
 ### Documentación del Proyecto
-- **Documentación General:** [/README.md](/../README.md)
-- **Documentación Profesional:** [Wiki](https://www.retrogamehub.games/wiki)
+- **README general:** [/README.md](/../README.md)
+- **Documentación:** [Wiki](https://retrogamecloud.mintlify.app/)
 - **Workflows CI/CD:** [.github/README-WF.md](./.github/README-WF.md)
 - **Testing:** [tests/README.md](./tests/README.md)
 
